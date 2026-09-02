@@ -1,0 +1,2579 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mo7areb Luxury Portal</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script>
+        // إخفاء شاشة تسجيل الدخول فوراً قبل تحميل أي شيء إذا كان المستخدم مسجل دخوله
+        const savedAuthEarly = JSON.parse(localStorage.getItem('mo7areb_auth') || 'null');
+        if (savedAuthEarly && savedAuthEarly.isLoggedIn) {
+            document.write('<style>#loginScreen { display: none !important; }</style>');
+        }
+    </script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { 
+            display: flex; 
+            height: 100vh; 
+            background: #0b1329; 
+            color: #f8fafc; 
+            overflow: hidden; 
+        }
+        
+        .login-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(11, 19, 41, 0.98);
+            backdrop-filter: blur(10px);
+            display: flex; 
+            justify-content: center;
+            align-items: center;
+            z-index: 99999;
+        }
+
+        .login-card {
+            background: linear-gradient(145deg, #111a2e, #090e1a);
+            border: 1px solid rgba(212, 175, 55, 0.4);
+            border-radius: 20px;
+            padding: 35px 30px;
+            width: 400px;
+            max-width: 90%;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), 0 0 20px rgba(212, 175, 55, 0.2);
+            text-align: center;
+        }
+
+        .login-card h2 {
+            font-size: 22px;
+            color: #d4af37;
+            margin-bottom: 5px;
+            font-weight: 800;
+            letter-spacing: 1px;
+        }
+
+        .login-card p {
+            font-size: 13px;
+            color: #94a3b8;
+            margin-bottom: 25px;
+        }
+
+        .login-error {
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #f87171;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 12px;
+            margin-bottom: 15px;
+            display: none;
+        }
+
+        .sidebar-toggle {
+            position: fixed;
+            top: 15px;
+            right: 15px;
+            z-index: 10000;
+            background: linear-gradient(135deg, #d4af37, #aa7c11);
+            color: #0b1329;
+            border: none;
+            width: 45px;
+            height: 45px;
+            border-radius: 12px;
+            font-size: 20px;
+            font-weight: bold;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+            transition: all 0.4s ease;
+        }
+        .sidebar-toggle:hover {
+            transform: scale(1.05);
+        }
+        .sidebar-toggle.show {
+            right: 275px; 
+        }
+
+        .sidebar-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(11, 19, 41, 0.8);
+            backdrop-filter: blur(5px);
+            z-index: 9998;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.4s ease;
+        }
+        .sidebar-overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .sidebar { 
+            position: fixed;
+            top: 0;
+            right: 0;
+            height: 100vh;
+            width: 260px; 
+            background: #111a2e; 
+            padding: 25px 15px; 
+            display: flex; 
+            flex-direction: column; 
+            border-left: 1px solid rgba(212, 175, 55, 0.15); 
+            box-shadow: -4px 0 25px rgba(0, 0, 0, 0.6);
+            z-index: 9999;
+            transform: translateX(100%); 
+            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .sidebar.show {
+            transform: translateX(0); 
+        }
+
+        .sidebar h2 { 
+            font-size: 20px; 
+            margin-bottom: 30px; 
+            text-align: center; 
+            color: #d4af37;
+            font-weight: 800; 
+            letter-spacing: 1px; 
+            text-transform: uppercase;
+        }
+        .menu-item { 
+            padding: 12px 16px; 
+            margin-bottom: 10px; 
+            border-radius: 10px; 
+            cursor: pointer; 
+            transition: all 0.3s ease; 
+            color: #94a3b8; 
+            font-weight: 600; 
+            font-size: 14px;
+            border: 1px solid transparent; 
+            background: rgba(255, 255, 255, 0.01);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .menu-item:hover, .menu-item.active { 
+            background: linear-gradient(135deg, #d4af37, #aa7c11); 
+            color: #0b1329; 
+            box-shadow: 0 4px 15px rgba(212, 175, 55, 0.3); 
+            font-weight: 700;
+            transform: translateX(-4px);
+        }
+
+        .menu-item.logout-btn {
+            margin-top: auto;
+            margin-bottom: 30px;
+            background: rgba(239, 68, 68, 0.1);
+            color: #f87171;
+            border: 1px solid rgba(239, 68, 68, 0.2);
+        }
+        .menu-item.logout-btn:hover {
+            background: rgba(239, 68, 68, 0.3);
+            color: #ffffff;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .pending-badge {
+            background: #ef4444;
+            color: white;
+            font-size: 11px;
+            font-weight: 800;
+            padding: 2px 7px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(239, 68, 68, 0.6);
+            display: none;
+        }
+        
+        .main-content { 
+            flex: 1; 
+            padding: 25px; 
+            padding-top: 75px; 
+            overflow-y: auto; 
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            width: 100%; 
+        }
+        .section { display: none; width: 100%; }
+        .section.active { display: block; }
+        
+        .profile-card-hotel, .form-card-hotel {
+            background: linear-gradient(145deg, #111a2e, #090e1a);
+            border: 1px solid rgba(212, 175, 55, 0.25);
+            border-radius: 20px;
+            padding: 22px 28px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.6);
+            margin: 0 auto 20px auto;
+            width: 100% !important; 
+            max-width: 95% !important;
+            position: relative;
+        }
+
+        .card-header-hotel {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(212, 175, 55, 0.15);
+            padding-bottom: 12px;
+            margin-bottom: 20px;
+        }
+
+        .card-header-hotel h3 {
+            font-size: 18px;
+            color: #d4af37;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+            margin-bottom: 0;
+        }
+
+        .vip-badge {
+            background: rgba(212, 175, 55, 0.1);
+            color: #f39c12;
+            border: 1px solid rgba(212, 175, 55, 0.3);
+            padding: 4px 14px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 1px;
+        }
+
+        .profile-main-body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .avatar-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+            position: relative;
+        }
+
+        .avatar-real-cutout {
+            width: 220px;
+            height: 220px;
+            border-radius: 50%;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.4s ease;
+            border: 3px solid #d4af37;
+            background: #090e1a;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        }
+
+        .avatar-real-cutout:hover {
+            transform: translateY(-5px) scale(1.03);
+            box-shadow: 0 15px 30px rgba(212, 175, 55, 0.3);
+        }
+
+        .avatar-real-cutout img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .avatar-placeholder {
+            font-size: 80px;
+            color: #d4af37;
+        }
+
+        .avatar-actions {
+            display: flex;
+            gap: 10px;
+            width: 100%;
+            max-width: 280px;
+            justify-content: center;
+            z-index: 5;
+        }
+
+        .btn-img {
+            padding: 8px 14px;
+            font-size: 12px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-weight: 700;
+            transition: all 0.2s ease;
+            text-align: center;
+            flex: 1;
+        }
+
+        .btn-upload { 
+            background: linear-gradient(135deg, #d4af37, #aa7c11); 
+            color: #0b1329; 
+            box-shadow: 0 3px 12px rgba(212, 175, 55, 0.3);
+        }
+        .btn-upload:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(212, 175, 55, 0.5); }
+        
+        .btn-edit { background: #1e293b; color: #f8fafc; border: 1px solid #334155; }
+        .btn-edit:hover { background: #334155; }
+
+        .btn-delete { background: rgba(239, 68, 68, 0.12); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.25); }
+        .btn-delete:hover { background: rgba(239, 68, 68, 0.25); }
+
+        .profile-grid {
+            width: 100%;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 14px;
+            margin-top: 5px;
+        }
+
+        .info-box {
+            background: rgba(17, 26, 46, 0.6);
+            padding: 12px 16px;
+            border-radius: 12px;
+            border: 1px solid rgba(212, 175, 55, 0.12);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transition: all 0.3s ease;
+        }
+
+        .info-box:hover {
+            transform: translateY(-3px);
+            border-color: rgba(212, 175, 55, 0.4);
+            box-shadow: 0 8px 20px rgba(212, 175, 55, 0.15);
+            background: rgba(25, 37, 64, 0.8);
+        }
+
+        .info-icon {
+            font-size: 20px;
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            background: rgba(212, 175, 55, 0.08);
+            border: 1px solid rgba(212, 175, 55, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .info-data {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .info-box label {
+            font-size: 11px;
+            color: #94a3b8;
+            margin-bottom: 2px;
+            margin-top: 0;
+            font-weight: 600;
+        }
+
+        .info-box .value {
+            font-size: 14px;
+            color: #f8fafc;
+            font-weight: 700;
+            letter-spacing: 0.2px;
+        }
+
+        .quick-actions-grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); 
+            gap: 16px; 
+            width: 100% !important;
+            max-width: 95% !important;
+            margin: 0 auto 20px auto;
+        }
+
+        .action-card {
+            background: linear-gradient(135deg, rgba(17, 26, 46, 0.8), rgba(9, 14, 26, 0.9));
+            border: 1px solid rgba(212, 175, 55, 0.2);
+            border-radius: 16px;
+            padding: 18px 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+            text-align: center;
+        }
+
+        .action-card:hover {
+            transform: translateY(-5px);
+            border-color: #d4af37;
+            box-shadow: 0 10px 25px rgba(212, 175, 55, 0.25);
+            background: linear-gradient(135deg, #192540, #111a2e);
+        }
+
+        .action-card .action-icon {
+            font-size: 28px;
+            width: 50px;
+            height: 50px;
+            border-radius: 14px;
+            background: rgba(212, 175, 55, 0.1);
+            border: 1px solid rgba(212, 175, 55, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+
+        .action-card:hover .action-icon {
+            background: linear-gradient(135deg, #d4af37, #aa7c11);
+            color: #0b1329;
+            transform: scale(1.1);
+        }
+
+        .action-card span {
+            font-size: 13px;
+            font-weight: 700;
+            color: #f8fafc;
+            letter-spacing: 0.3px;
+        }
+
+        .pending-missions-container {
+            margin-bottom: 25px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .pending-card {
+            background: linear-gradient(135deg, rgba(212, 175, 55, 0.1), rgba(17, 26, 46, 0.8));
+            border: 1px solid #d4af37;
+            border-radius: 12px;
+            padding: 12px 18px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .pending-card:hover, .pending-card.selected {
+            background: linear-gradient(135deg, rgba(212, 175, 55, 0.25), rgba(25, 37, 64, 0.9));
+            box-shadow: 0 4px 15px rgba(212, 175, 55, 0.2);
+            border-color: #f39c12;
+        }
+
+        .pending-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            background: #eab308;
+            border-radius: 50%;
+            box-shadow: 0 0 8px #eab308;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(234, 179, 8, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(234, 179, 8, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(234, 179, 8, 0); }
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-group.full-width {
+            grid-column: 1 / -1;
+        }
+
+        label { display: block; margin-top: 8px; font-weight: 600; margin-bottom: 6px; color: #cbd5e1; font-size: 13px; }
+        input, select, textarea { 
+            width: 100%; padding: 12px 14px; border-radius: 10px; 
+            border: 1px solid rgba(212, 175, 55, 0.2); 
+            background: #090e1a; 
+            color: white; font-size: 13px; 
+            transition: 0.3s;
+        }
+        input:focus, select:focus, textarea:focus { outline: none; border-color: #d4af37; box-shadow: 0 0 12px rgba(212, 175, 55, 0.25); }
+        
+        .main-btn { 
+            background: linear-gradient(135deg, #d4af37, #aa7c11); 
+            color: #0b1329; border: none; padding: 14px 20px; border-radius: 10px; 
+            margin-top: 22px; cursor: pointer; font-size: 15px; font-weight: 800; width: 100%; 
+            transition: all 0.3s ease; 
+            box-shadow: 0 4px 15px rgba(212, 175, 55, 0.25);
+            letter-spacing: 0.5px;
+        }
+        .main-btn:hover { 
+            background: linear-gradient(135deg, #c59f27, #966c0d); 
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(212, 175, 55, 0.4);
+        }
+
+        .btn-quick-start {
+            background: linear-gradient(135deg, #eab308, #ca8a04);
+            color: #0b1329;
+            border: none;
+            padding: 12px 18px;
+            border-radius: 10px;
+            font-weight: 800;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(234, 179, 8, 0.3);
+            margin-bottom: 20px;
+            width: 100%;
+        }
+
+        .btn-quick-start:hover { transform: translateY(-2px); }
+
+        .time-box-info {
+            background: rgba(212, 175, 55, 0.08);
+            border: 1px dashed rgba(212, 175, 55, 0.3);
+            padding: 10px 14px;
+            border-radius: 8px;
+            color: #d4af37;
+            font-size: 12px;
+            font-weight: bold;
+            margin-top: 8px;
+            text-align: center;
+        }
+
+        .calc-result-box {
+            background: rgba(17, 26, 46, 0.9);
+            border: 1px solid #d4af37;
+            border-radius: 12px;
+            padding: 15px;
+            margin-top: 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+            gap: 12px;
+        }
+        .calc-card {
+            background: #090e1a;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid rgba(212, 175, 55, 0.15);
+        }
+        .calc-card h4 { font-size: 11px; color: #94a3b8; margin-bottom: 5px; }
+        .calc-card .amount { font-size: 15px; font-weight: 800; color: #d4af37; }
+
+        .summary-cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 15px;
+            margin-bottom: 22px;
+            width: 100%;
+        }
+
+        .summary-stat-card {
+            background: linear-gradient(135deg, rgba(17, 26, 46, 0.9), rgba(9, 14, 26, 0.95));
+            border: 1px solid rgba(212, 175, 55, 0.25);
+            border-radius: 14px;
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+
+        .summary-stat-card:hover {
+            transform: translateY(-4px);
+            border-color: #d4af37;
+            box-shadow: 0 8px 22px rgba(212, 175, 55, 0.25);
+            background: rgba(25, 37, 64, 0.9);
+        }
+
+        .summary-stat-icon {
+            font-size: 22px;
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            background: rgba(212, 175, 55, 0.1);
+            border: 1px solid rgba(212, 175, 55, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .summary-stat-info {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+        }
+
+        .summary-stat-info span {
+            font-size: 11px;
+            color: #94a3b8;
+            font-weight: 600;
+        }
+
+        .summary-stat-info h4 {
+            font-size: 14px;
+            color: #d4af37;
+            font-weight: 800;
+            margin-top: 2px;
+        }
+
+        .filter-date-bar {
+            background: rgba(9, 14, 26, 0.8);
+            border: 1px solid rgba(212, 175, 55, 0.2);
+            border-radius: 12px;
+            padding: 14px;
+            margin-bottom: 18px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            flex-wrap: wrap;
+            width: 100%;
+        }
+
+        .filter-date-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .filter-date-group label {
+            margin: 0;
+            font-size: 12px;
+            color: #d4af37;
+            white-space: nowrap;
+        }
+
+        .filter-date-group input {
+            padding: 8px 12px;
+            font-size: 12px;
+            width: 150px;
+        }
+
+        .btn-filter {
+            background: linear-gradient(135deg, #d4af37, #aa7c11);
+            color: #0b1329;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-filter:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(212, 175, 55, 0.3); }
+
+        .btn-reset-filter {
+            background: rgba(239, 68, 68, 0.15);
+            color: #f87171;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-reset-filter:hover { background: rgba(239, 68, 68, 0.3); }
+
+        .reports-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+            width: 100%;
+        }
+
+        .report-tab-btn {
+            background: #090e1a;
+            color: #94a3b8;
+            border: 1px solid rgba(212, 175, 55, 0.2);
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 700;
+            font-size: 13px;
+            transition: all 0.3s ease;
+        }
+
+        .report-tab-btn.active, .report-tab-btn:hover {
+            background: linear-gradient(135deg, #d4af37, #aa7c11);
+            color: #0b1329;
+            border-color: #d4af37;
+        }
+        
+        .btn-export {
+            background: #10b981;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        }
+
+        .btn-export:hover {
+            background: #059669;
+            transform: translateY(-2px);
+        }
+
+        .btn-print {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+
+        .btn-print:hover {
+            background: #2563eb;
+            transform: translateY(-2px);
+        }
+
+        .btn-table-del {
+            background: rgba(239, 68, 68, 0.2);
+            color: #f87171;
+            border: 1px solid rgba(239, 68, 68, 0.4);
+            padding: 5px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 12px;
+            transition: all 0.2s ease;
+        }
+
+        .btn-table-del:hover {
+            background: rgba(239, 68, 68, 0.4);
+            color: #ffffff;
+        }
+        
+        .btn-whatsapp {
+            background: #25D366;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            margin-left: 5px;
+        }
+        
+        .btn-whatsapp:hover {
+            background: #1ebe57;
+            box-shadow: 0 4px 10px rgba(37, 211, 102, 0.4);
+        }
+
+        .table-container {
+            width: 100%;
+            overflow-x: auto;
+            border-radius: 12px;
+            border: 1px solid rgba(212, 175, 55, 0.15);
+            background: #111a2e;
+            margin-top: 15px;
+        }
+
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            overflow: hidden; 
+        }
+
+        th, td { 
+            border: 1px solid #1e293b; 
+            padding: 12px 14px; 
+            text-align: right; 
+            font-size: 13px; 
+            white-space: nowrap;
+        }
+
+        th { 
+            background: #090e1a; 
+            color: #d4af37; 
+            font-weight: 700; 
+        }
+
+        .portal-footer {
+            text-align: center;
+            padding: 20px 0 10px 0;
+            margin-top: auto;
+            border-top: 1px solid rgba(212, 175, 55, 0.1);
+            width: 100%;
+        }
+
+        .portal-footer p {
+            font-size: 13px;
+            color: #94a3b8;
+            letter-spacing: 1px;
+            font-weight: 500;
+        }
+
+        .portal-footer span {
+            color: #d4af37;
+            font-weight: 800;
+            text-transform: uppercase;
+            text-shadow: 0 0 10px rgba(212, 175, 55, 0.3);
+        }
+
+        @media print {
+            @page { size: A4 portrait; margin: 8mm; }
+            body { 
+                background: #ffffff !important; color: #000000 !important;
+                font-size: 9.5pt !important; line-height: 1.3 !important;
+                -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;
+                height: auto !important; overflow: visible !important;
+            }
+            .sidebar, .reports-controls, .vip-badge, .portal-footer, 
+            .filter-date-bar, .no-print, button, .btn-export, 
+            .quick-actions-grid, .avatar-actions, #pendingContainer,
+            .summary-cards-grid, .login-overlay, .sidebar-toggle, .sidebar-overlay { display: none !important; }
+            .main-content { padding: 0 !important; margin: 0 !important; width: 100% !important; overflow: visible !important; display: block !important; }
+            .form-card-hotel, .profile-card-hotel { 
+                border: 1px solid #333 !important; box-shadow: none !important; background: #fff !important; 
+                padding: 10px 14px !important; margin: 0 auto 10px auto !important; max-width: 100% !important;
+                width: 100% !important; page-break-inside: avoid; border-radius: 6px !important;
+            }
+            .card-header-hotel { border-bottom: 2px solid #000 !important; margin-bottom: 10px !important; padding-bottom: 4px !important; }
+            .card-header-hotel h3 { color: #000 !important; font-size: 13pt !important; text-align: center !important; width: 100% !important; }
+            .info-box { background: #f8f9fa !important; border: 1px solid #ccc !important; box-shadow: none !important; color: #000 !important; padding: 5px 8px !important; }
+            .info-box label { color: #555 !important; font-size: 8.5pt !important; }
+            .info-box .value { color: #000 !important; font-size: 9.5pt !important; }
+            .info-icon { display: none !important; }
+            label { color: #000 !important; font-weight: bold !important; font-size: 9pt !important; }
+            input, select, textarea { background: transparent !important; border: none !important; border-bottom: 1px dashed #666 !important; color: #000 !important; border-radius: 0 !important; padding: 2px 4px !important; box-shadow: none !important; font-size: 9.5pt !important; font-weight: bold !important; }
+            .time-box-info { background: #f0f0f0 !important; border: 1px solid #666 !important; color: #000 !important; padding: 5px !important; font-size: 8.5pt !important; }
+            .calc-result-box { background: #fff !important; border: 1px solid #000 !important; padding: 8px !important; gap: 6px !important; }
+            .calc-card { background: #f9f9f9 !important; border: 1px solid #aaa !important; padding: 6px !important; }
+            .calc-card h4 { color: #333 !important; font-size: 8pt !important; }
+            .calc-card .amount { color: #000 !important; font-size: 10pt !important; }
+            .table-container { border: none !important; background: transparent !important; overflow: visible !important; margin-top: 5px !important; }
+            table { border-collapse: collapse !important; width: 100% !important; margin-top: 5px !important; }
+            th, td { border: 1px solid #222 !important; color: #000 !important; padding: 5px 6px !important; font-size: 9pt !important; line-height: 1.25 !important; text-align: right !important; white-space: normal !important; }
+            th { background-color: #e2e8f0 !important; color: #000 !important; font-weight: bold !important; font-size: 9.5pt !important; }
+            tr { page-break-inside: avoid !important; }
+            .avatar-real-cutout { border: none !important; width: 90px !important; height: 90px !important; }
+            .avatar-real-cutout img { width: 100px !important; height: 100px !important; }
+            .avatar-placeholder { font-size: 40px !important; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="login-overlay" id="loginScreen">
+        <div class="login-card">
+            <h2>Mo7areb Luxury Portal</h2>
+            <p>برجاء إدخال بيانات تسجيل الدخول للوصول للبوابة</p>
+            
+            <div class="login-error" id="loginError">❌ اسم المستخدم أو كلمة المرور غير صحيحة!</div>
+            
+            <form onsubmit="handleLogin(event)">
+                <div class="form-group" style="text-align: right;">
+                    <label>اسم المستخدم:</label>
+                    <input type="text" id="login_username" required placeholder="أدخل اسم المستخدم...">
+                </div>
+
+                <div class="form-group" style="text-align: right; margin-top: 12px;">
+                    <label>كلمة المرور:</label>
+                    <input type="password" id="login_password" required placeholder="أدخل كلمة المرور...">
+                </div>
+
+                <button type="submit" class="main-btn" style="margin-top: 25px;">تسجيل الدخول 🔑</button>
+            </form>
+        </div>
+    </div>
+
+    <button class="sidebar-toggle" id="menuToggle" onclick="toggleSidebar()">
+        <span id="menuIcon">❮</span>
+    </button>
+
+    <div class="sidebar-overlay" id="menuOverlay" onclick="toggleSidebar()"></div>
+
+    <div class="sidebar" id="mainSidebar">
+        <h2>Mo7areb Portal</h2>
+        <div class="menu-item active" id="nav-home" onclick="showSection('home', this)">
+            <span>الرئيسية</span>
+        </div>
+        <div class="menu-item" id="nav-mission" onclick="showSection('mission', this)">
+            <span>طلب مأمورية</span>
+            <span class="pending-badge" id="missionBadge">0</span>
+        </div>
+        <div class="menu-item" id="nav-vacation" onclick="showSection('vacation', this)">
+            <span>طلب إجازة</span>
+        </div>
+        <div class="menu-item" id="nav-permission" onclick="showSection('permission', this)">
+            <span>طلب إذن</span>
+        </div>
+        <div class="menu-item" id="nav-calculator" onclick="showSection('calculator', this)">
+            <span>الحاسبة الشهريّة</span>
+        </div>
+        <div class="menu-item" id="nav-reports" onclick="showSection('reports', this)">
+            <span>التقارير والملخصات</span>
+        </div>
+        <div class="menu-item" id="nav-settings" onclick="showSection('settings', this)">
+            <span>الإعدادات</span>
+        </div>
+        <div class="menu-item logout-btn" onclick="logout()">
+            <span>تسجيل الخروج 🚪</span>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div>
+            <div id="home" class="section active">
+                <div class="profile-card-hotel">
+                    <div class="card-header-hotel">
+                        <h3>بطاقة البيانات الشخصية</h3>
+                        <div class="vip-badge" id="vip_badge_title">VIP EXECUTIVE</div>
+                    </div>
+
+                    <div class="profile-main-body">
+                        <div class="avatar-section">
+                            <div class="avatar-real-cutout" onclick="triggerImageInput()" title="اضغط لرفع أو تغيير الصورة">
+                                <span class="avatar-placeholder" id="avatarPlaceholder">👤</span>
+                                <img id="userAvatar" src="" alt="صورة الموظف" style="display: none;">
+                            </div>
+                            <input type="file" id="imageInput" accept="image/*" style="display: none;" onchange="handleImageUpload(event)">
+                            <div class="avatar-actions">
+                                <button class="btn-img btn-upload" id="uploadBtn" onclick="triggerImageInput()">رفع صورة</button>
+                                <button class="btn-img btn-edit" id="editBtn" onclick="triggerImageInput()" style="display: none;">تعديل</button>
+                                <button class="btn-img btn-delete" id="deleteBtn" onclick="deleteAvatarImage()" style="display: none;">حذف</button>
+                            </div>
+                        </div>
+
+                        <div class="profile-grid">
+                            <div class="info-box">
+                                <div class="info-icon">👤</div>
+                                <div class="info-data">
+                                    <label>الاسم الكامل</label>
+                                    <div class="value" id="profile_name">-</div>
+                                </div>
+                            </div>
+                            <div class="info-box">
+                                <div class="info-icon">🆔</div>
+                                <div class="info-data">
+                                    <label>الكود الوظيفي</label>
+                                    <div class="value" id="profile_code">-</div>
+                                </div>
+                            </div>
+                            <div class="info-box">
+                                <div class="info-icon">🏢</div>
+                                <div class="info-data">
+                                    <label>الإدارة</label>
+                                    <div class="value" id="profile_dept">-</div>
+                                </div>
+                            </div>
+                            <div class="info-box">
+                                <div class="info-icon">📂</div>
+                                <div class="info-data">
+                                    <label>القسم</label>
+                                    <div class="value" id="profile_sec">-</div>
+                                </div>
+                            </div>
+                            <div class="info-box">
+                                <div class="info-icon">🎓</div>
+                                <div class="info-data">
+                                    <label>التخصص</label>
+                                    <div class="value" id="profile_spec">-</div>
+                                </div>
+                            </div>
+                            <div class="info-box">
+                                <div class="info-icon">📞</div>
+                                <div class="info-data">
+                                    <label>رقم التليفون</label>
+                                    <div class="value" id="profile_phone">-</div>
+                                </div>
+                            </div>
+                            <div class="info-box">
+                                <div class="info-icon">👨‍💼</div>
+                                <div class="info-data">
+                                    <label>المدير المباشر</label>
+                                    <div class="value" id="profile_mgr">-</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="quick-actions-grid">
+                    <div class="action-card" onclick="startQuickMission()">
+                        <div class="action-icon">🚀</div>
+                        <span>مأمورية ع الطاير</span>
+                    </div>
+                    <div class="action-card" onclick="navigateTo('mission', 'nav-mission')">
+                        <div class="action-icon">💼</div>
+                        <span>طلب مأمورية</span>
+                    </div>
+                    <div class="action-card" onclick="navigateTo('vacation', 'nav-vacation')">
+                        <div class="action-icon">🏖️</div>
+                        <span>طلب إجازة</span>
+                    </div>
+                    <div class="action-card" onclick="navigateTo('permission', 'nav-permission')">
+                        <div class="action-icon">⏰</div>
+                        <span>طلب إذن</span>
+                    </div>
+                    <div class="action-card" onclick="navigateTo('calculator', 'nav-calculator')">
+                        <div class="action-icon">🧮</div>
+                        <span>الحاسبة الشهرية</span>
+                    </div>
+                    <div class="action-card" onclick="navigateTo('reports', 'nav-reports')">
+                        <div class="action-icon">📊</div>
+                        <span>الملخصات والتقارير</span>
+                    </div>
+                    <div class="action-card" id="quick-action-settings" onclick="navigateTo('settings', 'nav-settings')">
+                        <div class="action-icon">⚙️</div>
+                        <span>الإعدادات</span>
+                    </div>
+                    <div class="action-card" onclick="logout()" style="background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(185, 28, 28, 0.8)); border-color: #ef4444;">
+                        <div class="action-icon" style="color: #f87171; background: rgba(239, 68, 68, 0.2); border-color: rgba(239, 68, 68, 0.4);">🚪</div>
+                        <span>تسجيل الخروج</span>
+                    </div>
+                </div>
+            </div>
+
+            <div id="mission" class="section">
+                <div class="form-card-hotel">
+                    <div class="card-header-hotel">
+                        <h3>تسجيل طلب مأمورية عمل</h3>
+                        <div class="vip-badge">OFFICIAL MISSION</div>
+                    </div>
+
+                    <button class="btn-quick-start" onclick="startQuickMission()">🚀 فتح مأمورية ع الطاير جديدة (تثبيت وقت الانطلاق الآن)</button>
+
+                    <div id="pendingContainer" style="display: none;">
+                        <h4 style="color: #d4af37; font-size: 14px; margin-bottom: 10px;">المأموريات المعلقة (اختر مأمورية لإغلاقها وتعبئة النهاية):</h4>
+                        <div class="pending-missions-container" id="pendingList"></div>
+                    </div>
+
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>اسم الموظف:</label>
+                            <input type="text" id="m_name" readonly style="opacity: 0.8;">
+                        </div>
+                        <div class="form-group">
+                            <label>جهة المأمورية (المكان):</label>
+                            <input type="text" id="m_place" placeholder="المكان المتجه إليه...">
+                        </div>
+                        <div class="form-group">
+                            <label>تاريخ البدء:</label>
+                            <input type="date" id="m_start_date">
+                        </div>
+                        <div class="form-group">
+                            <label>وقت البدء (الانطلاق):</label>
+                            <input type="time" id="m_start_time">
+                        </div>
+                        <div class="form-group">
+                            <label>تاريخ النهاية (اختياري - سيلتقط تلقائياً):</label>
+                            <input type="date" id="m_end_date">
+                        </div>
+                        <div class="form-group">
+                            <label>وقت النهاية (اختياري - سيلتقط تلقائياً):</label>
+                            <input type="time" id="m_end_time">
+                        </div>
+                        <div class="form-group full-width" style="flex-direction: row; align-items: center; gap: 10px; margin-top: 5px;">
+                            <input type="checkbox" id="m_is_holiday" style="width: auto; cursor: pointer; transform: scale(1.2);">
+                            <label for="m_is_holiday" style="margin: 0; cursor: pointer; color: #d4af37; font-weight: bold;">
+                                هل كان العمل في يوم إجازة رسمية / أسبوعية؟ 🌴 (العمل 4 ساعات فأكثر يحسب 16 ساعة إجازات)
+                            </label>
+                        </div>
+                        <div class="form-group full-width">
+                            <label>سبب / تفاصيل المأمورية (مطلوب):</label>
+                            <textarea id="m_details" rows="3" placeholder="اكتب سبب المأمورية والتفاصيل..."></textarea>
+                        </div>
+                    </div>
+                    <button class="main-btn" onclick="saveMission()">إغلاق وتسجيل المأمورية بالكامل</button>
+                </div>
+            </div>
+
+            <div id="vacation" class="section">
+                <div class="form-card-hotel">
+                    <div class="card-header-hotel">
+                        <h3>تسجيل طلب إجازة</h3>
+                        <div class="vip-badge">VACATION REQUEST</div>
+                    </div>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>اسم الموظف:</label>
+                            <input type="text" id="v_name" readonly style="opacity: 0.8;">
+                        </div>
+                        <div class="form-group">
+                            <label>نوع الإجازة:</label>
+                            <select id="v_type">
+                                <option value="سنوية">إجازة سنوية</option>
+                                <option value="عارضة">إجازة عارضة</option>
+                                <option value="اعتيادية">إجازة اعتيادية</option>
+                                <option value="مرضية">إجازة مرضية</option>
+                                <option value="بدون أجر">إجازة بدون أجر</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>مدة الإجازة:</label>
+                            <select id="v_duration_type" onchange="handleVacationDurationChange()">
+                                <option value="full">يوم كامل</option>
+                                <option value="multiple">أيام متعددة</option>
+                                <option value="half">نصف يوم</option>
+                                <option value="quarter">ربع يوم</option>
+                            </select>
+                        </div>
+                        <div class="form-group" id="group_days_count" style="display: none;">
+                            <label>عدد الأيام المطلوب:</label>
+                            <input type="number" id="v_days_count" min="1" value="1" oninput="calculateVacationDates('count')">
+                        </div>
+                        <div class="form-group" id="group_start_date">
+                            <label id="lbl_start_date">تاريخ الإجازة:</label>
+                            <input type="date" id="v_start_date" onchange="calculateVacationDates('date')">
+                        </div>
+                        <div class="form-group" id="group_end_date" style="display: none;">
+                            <label>إلى تاريخ:</label>
+                            <input type="date" id="v_end_date" onchange="calculateVacationDates('end_date')">
+                        </div>
+                        <div class="form-group" id="group_shift_period" style="display: none;">
+                            <label>الفترة الزمنية:</label>
+                            <select id="v_shift_period" onchange="updateShiftTimeText()">
+                                <option value="morning">صباحي</option>
+                                <option value="evening">مسائي</option>
+                            </select>
+                            <div class="time-box-info" id="shiftTimeText">⏰ الوقت المحدد: من 9:00 ص إلى 1:00 م</div>
+                        </div>
+                        <div class="form-group full-width">
+                            <label>سبب الإجازة / ملاحظات:</label>
+                            <textarea id="v_notes" rows="3" placeholder="أدخل أي ملاحظات أو تفاصيل إضافية..."></textarea>
+                        </div>
+                    </div>
+                    <button class="main-btn" onclick="saveVacation()">تقديم طلب الإجازة</button>
+                </div>
+            </div>
+
+            <div id="permission" class="section">
+                <div class="form-card-hotel">
+                    <div class="card-header-hotel">
+                        <h3>تسجيل طلب إذن مغادرة</h3>
+                        <div class="vip-badge">PERMISSION LEAVE</div>
+                    </div>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>اسم الموظف:</label>
+                            <input type="text" id="p_name" readonly style="opacity: 0.8;">
+                        </div>
+                        <div class="form-group">
+                            <label>تاريخ الإذن:</label>
+                            <input type="date" id="p_date">
+                        </div>
+                        <div class="form-group">
+                            <label>الفترة الزمنية للإذن:</label>
+                            <select id="p_shift" onchange="updatePermissionTimeText()">
+                                <option value="morning">صباحي (من 9:00 ص إلى 11:00 ص)</option>
+                                <option value="evening">مسائي (من 3:00 م إلى 5:00 م)</option>
+                            </select>
+                        </div>
+                        <div class="form-group full-width">
+                            <div class="time-box-info" id="p_time_info">⏰ الوقت المحدد للإذن: من 9:00 ص إلى 11:00 ص (ساعتان)</div>
+                        </div>
+                        <div class="form-group full-width">
+                            <label>سبب الإذن (اختياري):</label>
+                            <textarea id="p_reason" rows="3" placeholder="اكتب سبب طلب الإذن (إن وجد)..."></textarea>
+                        </div>
+                    </div>
+                    <button class="main-btn" onclick="savePermission()">تقديم طلب الإذن</button>
+                </div>
+            </div>
+
+            <div id="calculator" class="section">
+                <div class="form-card-hotel">
+                    <div class="card-header-hotel">
+                        <h3>الحاسبة الشهرية للاستحقاقات والخصومات</h3>
+                        <div class="vip-badge">MONTHLY CALCULATOR</div>
+                    </div>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>الشهر والسنة:</label>
+                            <input type="month" id="calc_month" onchange="fetchOvertimeForCalcMonth()">
+                        </div>
+                        <div class="form-group">
+                            <label>الراتب الأساسي (جنيه):</label>
+                            <input type="number" id="calc_base_salary" placeholder="أدخل قيمة الراتب الأساسي..." oninput="saveSalaryLocally()">
+                        </div>
+                        <div class="form-group">
+                            <label>إضافي الإجازات (16 ساعة = يوم عمل):</label>
+                            <input type="number" id="calc_holiday_overtime" value="0" step="0.5" oninput="runMonthlyCalculation()">
+                        </div>
+                        <div class="form-group">
+                            <label>الإضافي العادي (ساعات):</label>
+                            <input type="number" id="calc_regular_overtime" value="0" step="0.5" oninput="runMonthlyCalculation()">
+                        </div>
+                        <div class="form-group">
+                            <label>إجمالي الإضافي المجمع (ساعات):</label>
+                            <input type="number" id="calc_overtime_hours" value="0" readonly style="background: rgba(255,255,255,0.05); color: #94a3b8; border: 1px dashed rgba(212, 175, 55, 0.4);">
+                        </div>
+                        <div class="form-group">
+                            <label>معامل الساعة الإضافية (للعادي):</label>
+                            <select id="calc_overtime_rate" onchange="runMonthlyCalculation()">
+                                <option value="1.0" selected>1.0 (ساعة واحدة - أجر عادي)</option>
+                                <option value="1.5">1.5 (ساعة ونصف)</option>
+                                <option value="2.0">2.0 (ساعتان - العطلات الرسمية)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>مكافأة إضافية (جنيه):</label>
+                            <input type="number" id="calc_bonus" value="0" min="0" oninput="runMonthlyCalculation()">
+                        </div>
+                        <div class="form-group">
+                            <label>باقي تسوية قديمة (جنيه):</label>
+                            <input type="number" id="calc_settlement" value="0" oninput="runMonthlyCalculation()">
+                        </div>
+                        <div class="form-group">
+                            <label>خصومات الأيام (أيام غياب / خصم):</label>
+                            <input type="number" id="calc_deduction_days" value="0" min="0" step="0.5" oninput="runMonthlyCalculation()">
+                        </div>
+                        <div class="form-group">
+                            <label>عدد الأذونات غير المدفوعة (تتجاوز المسموح):</label>
+                            <input type="number" id="calc_unpaid_permissions" value="0" min="0" oninput="runMonthlyCalculation()">
+                        </div>
+                        <div class="form-group">
+                            <label>عدد أيام الإجازات بدون أجر:</label>
+                            <input type="number" id="calc_unpaid_vacations" value="0" min="0" oninput="runMonthlyCalculation()">
+                        </div>
+                    </div>
+                    <div class="calc-result-box">
+                        <div class="calc-card">
+                            <h4>أجر اليوم / الساعة</h4>
+                            <div class="amount" id="res_hourly_rate">0 ج.م</div>
+                        </div>
+                        <div class="calc-card">
+                            <h4>مستحقات الإضافي</h4>
+                            <div class="amount" id="res_overtime_total" style="color: #4ade80;">+0 ج.م</div>
+                        </div>
+                        <div class="calc-card">
+                            <h4>المكافأة والتسوية</h4>
+                            <div class="amount" id="res_bonus_settlement" style="color: #38bdf8;">+0 ج.م</div>
+                        </div>
+                        <div class="calc-card">
+                            <h4>إجمالي الخصومات (أيام/أذونات)</h4>
+                            <div class="amount" id="res_deductions_total" style="color: #f87171;">-0 ج.م</div>
+                        </div>
+                        <div class="calc-card">
+                            <h4>صافي مستحقات الشهر</h4>
+                            <div class="amount" id="res_net_salary" style="color: #d4af37; font-size: 18px;">0 ج.م</div>
+                        </div>
+                    </div>
+                    <button class="main-btn" onclick="saveMonthlySummary()">حفظ الملخص الشهري</button>
+                </div>
+            </div>
+
+            <div id="reports" class="section">
+                <div class="form-card-hotel">
+                    <div class="card-header-hotel">
+                        <h3 id="reportTitle">تقارير المأموريات والملخصات المسجلة</h3>
+                        <div class="vip-badge">SUMMARY & LOGS</div>
+                    </div>
+
+                    <div class="summary-cards-grid">
+                        <div class="summary-stat-card" onclick="switchReportTab('missions', document.querySelectorAll('.report-tab-btn')[1])">
+                            <div class="summary-stat-icon">💼</div>
+                            <div class="summary-stat-info">
+                                <span>إجمالي المأموريات</span>
+                                <h4 id="stat_missions_count">...</h4>
+                            </div>
+                        </div>
+                        <div class="summary-stat-card" onclick="navigateTo('mission', 'nav-mission')">
+                            <div class="summary-stat-icon">⏳</div>
+                            <div class="summary-stat-info">
+                                <span>مأموريات معلقة</span>
+                                <h4 id="stat_pending_missions">...</h4>
+                            </div>
+                        </div>
+                        <div class="summary-stat-card" onclick="switchReportTab('vacations', document.querySelectorAll('.report-tab-btn')[2])">
+                            <div class="summary-stat-icon">🏖️</div>
+                            <div class="summary-stat-info">
+                                <span>إجمالي الإجازات</span>
+                                <h4 id="stat_vacations_count">...</h4>
+                            </div>
+                        </div>
+                        <div class="summary-stat-card" onclick="switchReportTab('permissions', document.querySelectorAll('.report-tab-btn')[3])">
+                            <div class="summary-stat-icon">⏰</div>
+                            <div class="summary-stat-info">
+                                <span>إجمالي الأذونات</span>
+                                <h4 id="stat_permissions_count">...</h4>
+                            </div>
+                        </div>
+                        <div class="summary-stat-card" onclick="switchReportTab('missions', document.querySelectorAll('.report-tab-btn')[1])">
+                            <div class="summary-stat-icon" style="color: #4ade80; background: rgba(74, 222, 128, 0.1); border-color: rgba(74, 222, 128, 0.3);">🌴</div>
+                            <div class="summary-stat-info">
+                                <span style="font-size: 10px;">إضافي الإجازات (16س=يوم)</span>
+                                <h4 id="stat_holiday_overtime" style="font-size: 13px; margin-top: 4px;">...</h4>
+                            </div>
+                        </div>
+                        <div class="summary-stat-card" onclick="switchReportTab('missions', document.querySelectorAll('.report-tab-btn')[1])">
+                            <div class="summary-stat-icon" style="color: #38bdf8; background: rgba(56, 189, 248, 0.1); border-color: rgba(56, 189, 248, 0.3);">⚡</div>
+                            <div class="summary-stat-info">
+                                <span>الإضافي العادي</span>
+                                <h4 id="stat_regular_overtime" style="font-size: 13px; margin-top: 4px;">...</h4>
+                            </div>
+                        </div>
+                        <div class="summary-stat-card" onclick="switchReportTab('calculations', document.querySelectorAll('.report-tab-btn')[4])">
+                            <div class="summary-stat-icon">🧮</div>
+                            <div class="summary-stat-info">
+                                <span>أحدث صافي راتب</span>
+                                <h4 id="stat_latest_net">...</h4>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="filter-date-bar">
+                        <div class="filter-date-group">
+                            <label>📅 من تاريخ:</label>
+                            <input type="date" id="filter_from_date">
+                        </div>
+                        <div class="filter-date-group">
+                            <label>📅 إلى تاريخ:</label>
+                            <input type="date" id="filter_to_date">
+                        </div>
+                        <button class="btn-filter" onclick="applyDateFilter()">تطبيق الفلتر 🔍</button>
+                        <button class="btn-reset-filter" onclick="resetDateFilter()">إلغاء الفلتر 🔄</button>
+                    </div>
+
+                    <div class="reports-controls">
+                        <div>
+                            <button class="report-tab-btn active" onclick="switchReportTab('daily', this)">📅 الملخص اليومي</button>
+                            <button class="report-tab-btn" onclick="switchReportTab('missions', this)">💼 المأموريات</button>
+                            <button class="report-tab-btn" onclick="switchReportTab('vacations', this)">🏖️ الإجازات</button>
+                            <button class="report-tab-btn" onclick="switchReportTab('permissions', this)">⏰ الأذونات</button>
+                            <button class="report-tab-btn" onclick="switchReportTab('calculations', this)">🧮 ملخص الحاسبة</button>
+                        </div>
+                        <div style="display: flex; gap: 10px; margin-top: 10px;">
+                            <button class="btn-export" onclick="exportToExcel()">📊 تصدير لإكسيل</button>
+                            <button class="btn-print" onclick="window.print()">🖨️ طباعة الملخص</button>
+                        </div>
+                    </div>
+
+                    <div class="table-container">
+                        <table>
+                            <thead id="reportsHead"></thead>
+                            <tbody id="reportsTable"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div id="settings" class="section">
+                <div class="form-card-hotel" style="margin-bottom: 25px;">
+                    <div class="card-header-hotel">
+                        <h3>إعدادات حساب دخول النظام الرئيسي (Admin Credentials)</h3>
+                        <div class="vip-badge">SYSTEM LOGIN</div>
+                    </div>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>اسم المستخدم الرئيسي للنظام:</label>
+                            <input type="text" id="sys_username" placeholder="أدخل اسم المستخدم للسيستم...">
+                        </div>
+                        <div class="form-group">
+                            <label>كلمة المرور الرئيسية للنظام:</label>
+                            <input type="password" id="sys_password" placeholder="أدخل كلمة المرور الحالية أو الجديدة...">
+                        </div>
+                    </div>
+                    <button class="main-btn" onclick="saveSystemCredentials()">💾 حفظ بيانات دخول النظام الرئيسي</button>
+                </div>
+
+                <div class="form-card-hotel">
+                    <div class="card-header-hotel">
+                        <h3>إدارة ملفات الموظفين والحسابات الخاصة (سحابي متزامن عبر الإنترنت)</h3>
+                        <div class="vip-badge">EMPLOYEES MANAGEMENT</div>
+                    </div>
+
+                    <div class="form-grid">
+                        <input type="hidden" id="emp_id">
+                        <div class="form-group">
+                            <label>الاسم الكامل:</label>
+                            <input type="text" id="emp_name" placeholder="أدخل اسم الموظف...">
+                        </div>
+                        <div class="form-group">
+                            <label>الكود الوظيفي:</label>
+                            <input type="text" id="emp_code" placeholder="مثال: EMP-1049">
+                        </div>
+                        <div class="form-group">
+                            <label>اسم المستخدم (لتسجيل الدخول):</label>
+                            <input type="text" id="emp_username" placeholder="مثال: adham123">
+                        </div>
+                        <div class="form-group">
+                            <label>كلمة المرور الخاصة بالموظف:</label>
+                            <input type="password" id="emp_password" placeholder="أدخل كلمة المرور...">
+                        </div>
+                        <div class="form-group">
+                            <label>نوع الحساب (الصلاحية):</label>
+                            <select id="emp_role">
+                                <option value="employee">موظف عادي (يرى سجلاته فقط)</option>
+                                <option value="admin">مدير (له صلاحية الإعدادات)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>الإدارة:</label>
+                            <input type="text" id="emp_dept" placeholder="مثال: إدارة العمليات">
+                        </div>
+                        <div class="form-group">
+                            <label>القسم:</label>
+                            <input type="text" id="emp_sec" placeholder="مثال: قسم الدعم الفني">
+                        </div>
+                        <div class="form-group">
+                            <label>التخصص:</label>
+                            <input type="text" id="emp_spec" placeholder="مثال: أخصائي نظم ومعلومات">
+                        </div>
+                        <div class="form-group">
+                            <label>رقم التليفون:</label>
+                            <input type="text" id="emp_phone" placeholder="مثال: 01012345678">
+                        </div>
+                        <div class="form-group full-width">
+                            <label>المدير المباشر:</label>
+                            <input type="text" id="emp_mgr" placeholder="اسم المدير المباشر...">
+                        </div>
+                    </div>
+                    
+                    <div style="display: flex; gap: 15px;">
+                        <button class="main-btn" onclick="saveEmployeeDataToCloud()">💾 حفظ بيانات الموظف والحساب على السيرفر</button>
+                        <button class="main-btn" style="background: #1e293b; color: white; border: 1px solid #334155;" onclick="resetEmployeeForm()">🔄 إفراغ الحقول</button>
+                    </div>
+
+                    <h4 style="color: #d4af37; margin-top: 35px; margin-bottom: 15px; font-size: 15px; border-bottom: 1px solid rgba(212, 175, 55, 0.2); padding-bottom: 8px;">قائمة الموظفين والحسابات المسجلة سحابياً:</h4>
+                    
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>الاسم</th>
+                                    <th>الكود</th>
+                                    <th>اسم المستخدم</th>
+                                    <th>الصلاحية</th>
+                                    <th>الإدارة</th>
+                                    <th class="no-print">إجراءات</th>
+                                </tr>
+                            </thead>
+                            <tbody id="employeesTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="portal-footer">
+            <p>Designed & Developed with Excellence by <span>Adham Mo7areb</span></p>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, collection, addDoc, getDocs, getDoc, deleteDoc, doc, updateDoc, setDoc, query } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCxT6oNqFXDsuOAWSGmmIKXej25Ar0zxY0",
+            authDomain: "mo7areb-portal.firebaseapp.com",
+            projectId: "mo7areb-portal",
+            storageBucket: "mo7areb-portal.firebasestorage.app",
+            messagingSenderId: "491982360665",
+            appId: "1:491982360665:web:587760cd0b3b121e002148"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        window.currentUserRole = 'employee';
+        window.currentLoggedName = '';
+        let pendingMissions = [];
+        let activeSelectedIndex = null;
+        let currentReportType = 'daily';
+        let employeesList = [];
+        let activeEmpId = null;
+        let employeesLoaded = false;
+
+        let allMissionsData = [];
+        let allVacationsData = [];
+        let allPermissionsData = [];
+        let allCalculationsData = [];
+
+        const savedAuth = JSON.parse(localStorage.getItem('mo7areb_auth') || 'null');
+        if (savedAuth && savedAuth.isLoggedIn) {
+            document.getElementById('loginScreen').style.display = 'none';
+            window.currentUserRole = savedAuth.role;
+            window.currentLoggedName = savedAuth.name;
+            activeEmpId = savedAuth.empId;
+        }
+
+        window.showSection = function(sectionId, element) {
+            if (sectionId === 'settings' && window.currentUserRole !== 'admin') {
+                sectionId = 'home';
+            }
+
+            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+            document.querySelectorAll('.menu-item').forEach(m => m.classList.remove('active'));
+            document.getElementById(sectionId).classList.add('active');
+            
+            if (element) {
+                element.classList.add('active');
+            } else {
+                const navEl = document.getElementById('nav-' + sectionId);
+                if(navEl) navEl.classList.add('active');
+            }
+            
+            localStorage.setItem('mo7areb_active_section', sectionId);
+            
+            const sidebar = document.getElementById('mainSidebar');
+            if (sidebar.classList.contains('show') && window.innerWidth <= 768) {
+                toggleSidebar();
+            }
+            if (sectionId === 'reports') fetchReports();
+            if (sectionId === 'calculator') {
+                const savedSalary = localStorage.getItem('mo7areb_base_salary');
+                if (savedSalary) document.getElementById('calc_base_salary').value = savedSalary;
+                fetchOvertimeForCalcMonth();
+            }
+        };
+
+        window.navigateTo = function(sectionId, navId) {
+            const navElement = document.getElementById(navId);
+            showSection(sectionId, navElement);
+        };
+
+        (async function() {
+            const loginScreen = document.getElementById('loginScreen');
+            try {
+                if (savedAuth && savedAuth.isLoggedIn) {
+                    if (loginScreen) loginScreen.style.display = 'none';
+                    initSystemAuth();
+                    checkAuth();
+                } else {
+                    if (loginScreen) loginScreen.style.display = 'flex';
+                }
+            } catch(e) {
+                if (!savedAuth && loginScreen) loginScreen.style.display = 'flex';
+            }
+        })();
+
+        window.addEventListener('DOMContentLoaded', () => {
+            let initialSection = localStorage.getItem('mo7areb_active_section') || 'home';
+            if (initialSection === 'settings' && (!savedAuth || savedAuth.role !== 'admin')) {
+                initialSection = 'home';
+            }
+            showSection(initialSection);
+        });
+
+        setInterval(() => {
+            if(document.getElementById('calculator').classList.contains('active')) {
+                runMonthlyCalculation();
+            }
+        }, 1000);
+
+        async function monitorDatabaseSession() {
+            try {
+                const currentAuth = JSON.parse(localStorage.getItem('mo7areb_auth') || 'null');
+                if (!currentAuth || !currentAuth.empId) return;
+
+                const sessionRef = doc(db, "active_sessions", currentAuth.empId);
+                const sessionSnap = await getDoc(sessionRef);
+
+                if (sessionSnap.exists() && sessionSnap.data().isLoggedIn === false) {
+                    localStorage.removeItem('mo7areb_auth');
+                    window.location.reload();
+                } else if (currentAuth.empId !== 'admin_sys' && employeesLoaded) {
+                     const empExists = employeesList.some(e => e.id === currentAuth.empId);
+                     if (!empExists) {
+                         await setDoc(sessionRef, { isLoggedIn: false });
+                         localStorage.removeItem('mo7areb_auth');
+                         window.location.reload();
+                     }
+                }
+            } catch(e) {}
+        }
+        setInterval(monitorDatabaseSession, 3000); 
+
+        window.toggleSidebar = function() {
+            const sidebar = document.getElementById('mainSidebar');
+            const toggleBtn = document.getElementById('menuToggle');
+            const icon = document.getElementById('menuIcon');
+            const overlay = document.getElementById('menuOverlay');
+
+            sidebar.classList.toggle('show');
+            toggleBtn.classList.toggle('show');
+            overlay.classList.toggle('show');
+
+            if (sidebar.classList.contains('show')) { icon.innerText = '❯'; } else { icon.innerText = '❮'; }
+        };
+
+        async function initSystemAuth() {
+            try {
+                const sysSnap = await getDocs(collection(db, "system_config"));
+                let foundCreds = false;
+                sysSnap.forEach(d => {
+                    if(d.id === "main_credentials") {
+                        foundCreds = true;
+                        const data = d.data();
+                        document.getElementById('sys_username').value = data.username || 'admin';
+                        document.getElementById('sys_password').value = data.password || '123';
+                    }
+                });
+
+                if(!foundCreds) {
+                    await setDoc(doc(db, "system_config", "main_credentials"), { username: 'admin', password: '123' });
+                    document.getElementById('sys_username').value = 'admin';
+                    document.getElementById('sys_password').value = '123';
+                }
+            } catch(e) {}
+        }
+
+        async function checkAuth() {
+            await fetchEmployeesFromCloud();
+            
+            const loginScreen = document.getElementById('loginScreen');
+            const currentAuth = JSON.parse(localStorage.getItem('mo7areb_auth') || 'null');
+
+            if (!currentAuth || !currentAuth.isLoggedIn) {
+                loginScreen.style.display = 'flex';
+                return;
+            } else {
+                loginScreen.style.display = 'none';
+            }
+
+            applyPermissions(); 
+            loadPendingMissions();
+            applyActiveEmployee();
+        }
+
+        function applyPermissions() {
+            const settingsNav = document.getElementById('nav-settings');
+            const settingsCard = document.getElementById('quick-action-settings');
+            const vipBadge = document.getElementById('vip_badge_title');
+            
+            if(window.currentUserRole === 'admin') {
+                if(settingsNav) settingsNav.style.display = 'flex';
+                if(settingsCard) settingsCard.style.display = 'flex';
+                if(vipBadge) vipBadge.innerText = window.currentLoggedName === 'مدير النظام' ? 'SYSTEM ADMIN' : 'ADMIN (STAFF)';
+            } else {
+                if(settingsNav) settingsNav.style.display = 'none';
+                if(settingsCard) settingsCard.style.display = 'none';
+                if(vipBadge) vipBadge.innerText = 'STAFF MEMBER';
+            }
+        }
+
+        window.handleLogin = async function(event) {
+            if(event) event.preventDefault();
+            const u = document.getElementById('login_username').value.trim();
+            const p = document.getElementById('login_password').value.trim();
+            const errDiv = document.getElementById('loginError');
+
+            let sysUser = document.getElementById('sys_username').value.trim();
+            let sysPass = document.getElementById('sys_password').value.trim();
+            
+            try {
+                const sysSnap = await getDocs(collection(db, "system_config"));
+                sysSnap.forEach(d => {
+                    if(d.id === "main_credentials") {
+                        sysUser = d.data().username;
+                        sysPass = d.data().password;
+                    }
+                });
+            } catch(e) {}
+
+            await fetchEmployeesFromCloud();
+            const empMatch = employeesList.find(e => e.username && e.username === u && e.password === p);
+
+            if ((u === sysUser && p === sysPass) || empMatch) {
+                if (u === sysUser && p === sysPass) {
+                    window.currentUserRole = 'admin';
+                    activeEmpId = 'admin_sys';
+                    window.currentLoggedName = 'مدير النظام';
+                } else if (empMatch) {
+                    activeEmpId = empMatch.id;
+                    window.currentUserRole = empMatch.role || 'employee';
+                    window.currentLoggedName = empMatch.name;
+                }
+                
+                localStorage.setItem('mo7areb_auth', JSON.stringify({
+                    isLoggedIn: true,
+                    role: window.currentUserRole,
+                    name: window.currentLoggedName,
+                    empId: activeEmpId
+                }));
+                
+                try {
+                    await setDoc(doc(db, "active_sessions", activeEmpId), {
+                        isLoggedIn: true,
+                        role: window.currentUserRole,
+                        name: window.currentLoggedName,
+                        updatedAt: new Date()
+                    });
+                } catch(e) {}
+                
+                errDiv.style.display = 'none';
+                document.getElementById('login_username').value = '';
+                document.getElementById('login_password').value = '';
+                checkAuth();
+                showSection('home', document.getElementById('nav-home'));
+            } else {
+                errDiv.style.display = 'block';
+            }
+        };
+
+        window.logout = async function() {
+            if(confirm('هل أنت متأكد من تسجيل الخروج؟')) {
+                const currentAuth = JSON.parse(localStorage.getItem('mo7areb_auth') || 'null');
+                if (currentAuth && currentAuth.empId) {
+                    try {
+                        await setDoc(doc(db, "active_sessions", currentAuth.empId), {
+                            isLoggedIn: false, updatedAt: new Date()
+                        });
+                    } catch(e) {}
+                }
+                localStorage.removeItem('mo7areb_auth');
+                localStorage.removeItem('mo7areb_active_section');
+                window.location.reload();
+            }
+        };
+
+        window.saveSystemCredentials = async function() {
+            const user = document.getElementById('sys_username').value.trim();
+            const pass = document.getElementById('sys_password').value.trim();
+            if (!user || !pass) return alert('⚠️ برجاء إدخال اسم المستخدم وكلمة المرور الرئيسية.');
+            try {
+                await setDoc(doc(db, "system_config", "main_credentials"), { username: user, password: pass });
+                alert('✅ تم حفظ بيانات الدخول الرئيسية للنظام سحابياً بنجاح!');
+            } catch(e) { alert('❌ حدث خطأ أثناء الحفظ سحابياً: ' + e.message); }
+        };
+
+        window.fetchEmployeesFromCloud = async function() {
+            try {
+                const querySnapshot = await getDocs(collection(db, "employees"));
+                employeesList = [];
+                querySnapshot.forEach((docSnap) => { employeesList.push({ id: docSnap.id, ...docSnap.data() }); });
+                employeesLoaded = true;
+                renderEmployeesTable();
+                if(window.currentLoggedName) applyActiveEmployee();
+            } catch(e) {}
+        };
+
+        window.saveEmployeeDataToCloud = async function() {
+            const idInput = document.getElementById('emp_id').value;
+            const name = document.getElementById('emp_name').value;
+            const code = document.getElementById('emp_code').value;
+            const username = document.getElementById('emp_username').value.trim();
+            const password = document.getElementById('emp_password').value.trim();
+            const role = document.getElementById('emp_role').value;
+            const dept = document.getElementById('emp_dept').value;
+            const sec = document.getElementById('emp_sec').value;
+            const spec = document.getElementById('emp_spec').value;
+            const phone = document.getElementById('emp_phone').value;
+            const mgr = document.getElementById('emp_mgr').value;
+
+            if(!name || !code) return alert('⚠️ برجاء إدخال اسم الموظف والكود على الأقل.');
+
+            let existingAvatar = "";
+            let existingBaseSalary = "";
+            let existingPending = [];
+            
+            if(idInput) {
+                const found = employeesList.find(e => e.id === idInput);
+                if(found) {
+                    if (found.avatar) existingAvatar = found.avatar;
+                    if (found.baseSalary) existingBaseSalary = found.baseSalary;
+                    if (found.pendingMissions) existingPending = found.pendingMissions;
+                }
+            }
+
+            const empData = { 
+                name, code, username, password, role, dept, sec, spec, phone, mgr, 
+                avatar: existingAvatar, baseSalary: existingBaseSalary, pendingMissions: existingPending 
+            };
+
+            try {
+                if(idInput) await updateDoc(doc(db, "employees", idInput), empData);
+                else await addDoc(collection(db, "employees"), empData);
+                alert('✅ تم حفظ بيانات الموظف بنجاح!');
+                resetEmployeeForm();
+                fetchEmployeesFromCloud();
+            } catch (e) { alert('❌ حدث خطأ: ' + e.message); }
+        };
+
+        window.resetEmployeeForm = function() {
+            ['emp_id', 'emp_name', 'emp_code', 'emp_username', 'emp_password', 'emp_dept', 'emp_sec', 'emp_spec', 'emp_phone', 'emp_mgr'].forEach(id => document.getElementById(id).value = '');
+            document.getElementById('emp_role').value = 'employee';
+        };
+
+        function renderEmployeesTable() {
+            const tbody = document.getElementById('employeesTableBody');
+            if(!tbody) return;
+            tbody.innerHTML = '';
+            employeesList.forEach(emp => {
+                const roleText = emp.role === 'admin' ? '<span style="color:#eab308">مدير</span>' : 'موظف';
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${emp.name}</td><td>${emp.code}</td><td>${emp.username || '-'}</td>
+                        <td>${roleText}</td><td>${emp.dept}</td>
+                        <td class="no-print">
+                            <button class="btn-filter" style="padding: 5px 10px; font-size: 11px;" onclick="editEmployee('${emp.id}')">تعديل ✏️</button>
+                            <button class="btn-table-del" style="padding: 5px 10px; font-size: 11px; margin-right: 5px;" onclick="deleteEmployeeFromCloud('${emp.id}')">حذف 🗑️</button>
+                        </td>
+                    </tr>`;
+            });
+        }
+
+        window.editEmployee = function(id) {
+            const emp = employeesList.find(e => e.id === id);
+            if(emp) {
+                document.getElementById('emp_id').value = emp.id;
+                document.getElementById('emp_name').value = emp.name;
+                document.getElementById('emp_code').value = emp.code;
+                document.getElementById('emp_username').value = emp.username || '';
+                document.getElementById('emp_password').value = emp.password || '';
+                document.getElementById('emp_role').value = emp.role || 'employee';
+                document.getElementById('emp_dept').value = emp.dept;
+                document.getElementById('emp_sec').value = emp.sec;
+                document.getElementById('emp_spec').value = emp.spec;
+                document.getElementById('emp_phone').value = emp.phone;
+                document.getElementById('emp_mgr').value = emp.mgr;
+                document.querySelector('.main-content').scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        };
+
+        window.deleteEmployeeFromCloud = async function(id) {
+            if(!confirm('هل أنت متأكد من حذف هذا الموظف من السيرفر نهائياً؟ (سيتم تسجيل خروجه فوراً)')) return;
+            try {
+                const empToDelete = employeesList.find(e => e.id === id);
+                await deleteDoc(doc(db, "employees", id));
+                if (empToDelete && empToDelete.name === window.currentLoggedName) {
+                    await setDoc(doc(db, "active_sessions", id), { isLoggedIn: false });
+                    localStorage.removeItem('mo7areb_auth');
+                    window.location.reload();
+                }
+                alert('🗑️ تم الحذف بنجاح من السيرفر!');
+                await fetchEmployeesFromCloud();
+            } catch(e) { alert('❌ خطأ أثناء الحذف: ' + e.message); }
+        };
+
+        window.deleteRecord = async function(collectionName, docId) {
+            if(!confirm("هل أنت متأكد من حذف هذا السجل نهائياً؟")) return;
+            try {
+                await deleteDoc(doc(db, collectionName, docId));
+                alert("تم الحذف بنجاح!");
+                fetchReports(); 
+                fetchOvertimeForCalcMonth(); 
+            } catch(e) { alert("خطأ أثناء الحذف: " + e.message); }
+        };
+
+        function applyActiveEmployee() {
+            const updateEl = (id, val) => { if(document.getElementById(id)) document.getElementById(id).innerText = val || '-'; }
+            const setNameInput = (id, val) => { if(document.getElementById(id)) document.getElementById(id).value = val; }
+
+            if (activeEmpId === 'admin_sys') {
+                updateEl('profile_name', 'مدير النظام الأساسي');
+                updateEl('profile_code', 'ADMIN-SYS');
+                updateEl('profile_dept', 'الإدارة العليا');
+                updateEl('profile_sec', 'النظام الرئيسي');
+                updateEl('profile_spec', 'تحكم كامل');
+                updateEl('profile_phone', '-');
+                updateEl('profile_mgr', 'المالك');
+                setNameInput('m_name', 'مدير النظام الأساسي');
+                setNameInput('v_name', 'مدير النظام الأساسي');
+                setNameInput('p_name', 'مدير النظام الأساسي');
+                hideUserAvatar();
+
+                getDoc(doc(db, "system_config", "admin_salary")).then(snap => {
+                    if(snap.exists() && snap.data().baseSalary) {
+                        document.getElementById('calc_base_salary').value = snap.data().baseSalary;
+                        localStorage.setItem('mo7areb_base_salary', snap.data().baseSalary);
+                    }
+                }).catch(()=>{});
+                return;
+            }
+
+            let activeEmp = employeesList.find(e => e.id === activeEmpId);
+            if(!activeEmp) return; 
+
+            updateEl('profile_name', activeEmp.name);
+            updateEl('profile_code', activeEmp.code);
+            updateEl('profile_dept', activeEmp.dept);
+            updateEl('profile_sec', activeEmp.sec);
+            updateEl('profile_spec', activeEmp.spec);
+            updateEl('profile_phone', activeEmp.phone);
+            updateEl('profile_mgr', activeEmp.mgr);
+
+            setNameInput('m_name', activeEmp.name);
+            setNameInput('v_name', activeEmp.name);
+            setNameInput('p_name', activeEmp.name);
+
+            if (activeEmp.baseSalary) {
+                document.getElementById('calc_base_salary').value = activeEmp.baseSalary;
+                localStorage.setItem('mo7areb_base_salary', activeEmp.baseSalary);
+            }
+
+            if (activeEmp.avatar) displayUserAvatar(activeEmp.avatar);
+            else hideUserAvatar();
+        }
+
+        window.triggerImageInput = function() { document.getElementById('imageInput').click(); };
+        window.handleImageUpload = async function(event) {
+            const file = event.target.files[0];
+            if(!file) return;
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                const base64Img = e.target.result;
+                displayUserAvatar(base64Img);
+                if (activeEmpId && activeEmpId !== 'admin_sys') {
+                    try { await updateDoc(doc(db, "employees", activeEmpId), { avatar: base64Img }); } catch(err) {}
+                }
+            };
+            reader.readAsDataURL(file);
+        };
+        window.deleteAvatarImage = async function() {
+            if(!confirm("حذف الصورة الشخصية؟")) return;
+            hideUserAvatar();
+            if (activeEmpId && activeEmpId !== 'admin_sys') {
+                try { await updateDoc(doc(db, "employees", activeEmpId), { avatar: "" }); } catch(err) {}
+            }
+        };
+        function displayUserAvatar(src) {
+            document.getElementById('userAvatar').src = src;
+            document.getElementById('userAvatar').style.display = 'block';
+            document.getElementById('avatarPlaceholder').style.display = 'none';
+            document.getElementById('uploadBtn').style.display = 'none';
+            document.getElementById('editBtn').style.display = 'block';
+            document.getElementById('deleteBtn').style.display = 'block';
+        }
+        function hideUserAvatar() {
+            document.getElementById('userAvatar').src = '';
+            document.getElementById('userAvatar').style.display = 'none';
+            document.getElementById('avatarPlaceholder').style.display = 'block';
+            document.getElementById('uploadBtn').style.display = 'block';
+            document.getElementById('editBtn').style.display = 'none';
+            document.getElementById('deleteBtn').style.display = 'none';
+            document.getElementById('imageInput').value = '';
+        }
+
+        window.exportToExcel = function() {
+            let table = document.querySelector(".table-container table");
+            let cloneTable = table.cloneNode(true);
+            let noPrintElements = cloneTable.querySelectorAll('.no-print');
+            noPrintElements.forEach(el => el.remove());
+            let wb = XLSX.utils.table_to_book(cloneTable, {sheet: "التقارير"});
+            let d = new Date();
+            let dateStr = d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2, '0') + "-" + String(d.getDate()).padStart(2, '0');
+            XLSX.writeFile(wb, `Mo7areb_Reports_${dateStr}.xlsx`);
+        };
+
+        window.sendToWhatsApp = function(type, objStr) {
+            const obj = JSON.parse(decodeURIComponent(objStr));
+            let text = "";
+            if (type === 'mission') {
+                text = `*🌟 سجل مأمورية عمل 🌟*\n\n` +
+                       `👤 *الموظف:* ${obj.name}\n` +
+                       `🏢 *الجهة:* ${obj.place}\n` +
+                       `📅 *تاريخ البدء:* ${obj.startDate}\n` +
+                       `⏰ *وقت الانطلاق:* ${obj.startTime}\n` +
+                       `🏁 *تاريخ الانتهاء:* ${obj.endDate || 'غير محدد'}\n` +
+                       `⏳ *وقت الانتهاء:* ${obj.endTime || 'غير محدد'}\n` +
+                       `⚡ *إجمالي الإضافي:* ${obj.overtimeHours} ساعة\n` +
+                       `📝 *التفاصيل:* ${obj.details}\n\n` +
+                       `*_Mo7areb Luxury Portal_* 🚀`;
+            } else if (type === 'vacation') {
+                text = `*🌴 طلب إجازة 🌴*\n\n` +
+                       `👤 *الموظف:* ${obj.name}\n` +
+                       `🔖 *النوع:* ${obj.type}\n` +
+                       `⏱️ *المدة:* ${obj.durationText}\n` +
+                       `📅 *من:* ${obj.startDate}\n` +
+                       `🏁 *إلى:* ${obj.endDate}\n` +
+                       `📝 *ملاحظات:* ${obj.notes}\n\n` +
+                       `*_Mo7areb Luxury Portal_* 🚀`;
+            } else if (type === 'permission') {
+                text = `*⏰ طلب إذن مغادرة ⏰*\n\n` +
+                       `👤 *الموظف:* ${obj.name}\n` +
+                       `📅 *التاريخ:* ${obj.date}\n` +
+                       `⌛ *الفترة:* ${obj.shift} (${obj.timeRange})\n` +
+                       `📝 *السبب:* ${obj.reason}\n\n` +
+                       `*_Mo7areb Luxury Portal_* 🚀`;
+            }
+            window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
+        };
+
+        function calculateMissionOvertime(startDateStr, startTimeStr, endDateStr, endTimeStr, isHoliday) {
+            const start = new Date(`${startDateStr}T${startTimeStr}`);
+            const end = new Date(`${endDateStr}T${endTimeStr}`);
+            if (isNaN(start.getTime()) || isNaN(end.getTime()) || end <= start) return { holidayOvertime: 0, regularOvertime: 0, totalOvertime: 0, isShortHoliday: false };
+            let holidayOvertime = 0, regularOvertime = 0, isShortHoliday = false, currentDayStart = new Date(start);
+            while (currentDayStart < end) {
+                let nextDay = new Date(currentDayStart.getFullYear(), currentDayStart.getMonth(), currentDayStart.getDate() + 1);
+                let currentDayEnd = end < nextDay ? new Date(end) : nextDay;
+                let hoursInThisDay = (currentDayEnd - currentDayStart) / (1000 * 60 * 60);
+                if (currentDayStart.getTime() === start.getTime() && isHoliday) {
+                    if (hoursInThisDay >= 4) { holidayOvertime += 16; } else { regularOvertime += hoursInThisDay * 2; isShortHoliday = true; }
+                } else {
+                    let currentMinute = new Date(currentDayStart);
+                    let minuteCount = 0;
+                    while (currentMinute < currentDayEnd) {
+                        let h = currentMinute.getHours();
+                        if (h < 9 || h >= 17) minuteCount++;
+                        currentMinute.setMinutes(currentMinute.getMinutes() + 1);
+                    }
+                    regularOvertime += (minuteCount / 60);
+                }
+                currentDayStart = nextDay;
+            }
+            return {
+                holidayOvertime: Math.round(holidayOvertime * 100) / 100,
+                regularOvertime: Math.round(regularOvertime * 100) / 100,
+                totalOvertime: Math.round((holidayOvertime + regularOvertime) * 100) / 100,
+                isShortHoliday: isShortHoliday
+            };
+        }
+
+        function getStorageKey() { return 'mo7areb_pending_missions_' + (window.currentLoggedName || 'default'); }
+        
+        window.loadPendingMissions = async function() {
+            let localPending = JSON.parse(localStorage.getItem(getStorageKey())) || [];
+            pendingMissions = localPending;
+            updatePendingUI();
+            
+            try {
+                if (activeEmpId === 'admin_sys') {
+                    const snap = await getDoc(doc(db, "system_config", "admin_pending"));
+                    if(snap.exists() && snap.data().missions) {
+                        pendingMissions = snap.data().missions;
+                        localStorage.setItem(getStorageKey(), JSON.stringify(pendingMissions));
+                        updatePendingUI();
+                    }
+                } else if (activeEmpId) {
+                    const snap = await getDoc(doc(db, "employees", activeEmpId));
+                    if(snap.exists() && snap.data().pendingMissions) {
+                        pendingMissions = snap.data().pendingMissions;
+                        localStorage.setItem(getStorageKey(), JSON.stringify(pendingMissions));
+                        updatePendingUI();
+                    }
+                }
+            } catch(e) {}
+        }
+
+        window.savePendingToStorage = async function() {
+            localStorage.setItem(getStorageKey(), JSON.stringify(pendingMissions));
+            try {
+                if (activeEmpId === 'admin_sys') {
+                    await setDoc(doc(db, "system_config", "admin_pending"), { missions: pendingMissions }, { merge: true });
+                } else if (activeEmpId) {
+                    await updateDoc(doc(db, "employees", activeEmpId), { pendingMissions: pendingMissions });
+                }
+            } catch(e) {}
+        }
+
+        function getCurrentDateTime() {
+            const now = new Date();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            return { date: `${year}-${month}-${day}`, time: `${hours}:${minutes}` };
+        }
+
+        const nowD = new Date();
+        document.getElementById('calc_month').value = `${nowD.getFullYear()}-${String(nowD.getMonth() + 1).padStart(2, '0')}`;
+
+        window.saveSalaryLocally = async function() {
+            const val = document.getElementById('calc_base_salary').value;
+            localStorage.setItem('mo7areb_base_salary', val);
+            runMonthlyCalculation();
+
+            if (activeEmpId === 'admin_sys') {
+                try { await setDoc(doc(db, "system_config", "admin_salary"), { baseSalary: val }, { merge: true }); } catch(e) {}
+            } else if (activeEmpId) {
+                try { await updateDoc(doc(db, "employees", activeEmpId), { baseSalary: val }); } catch(e) {}
+            }
+        };
+
+        window.fetchOvertimeForCalcMonth = async function() {
+            const calcMonth = document.getElementById('calc_month').value;
+            if (!calcMonth) return;
+            try {
+                const q = query(collection(db, "missions"));
+                const querySnapshot = await getDocs(q);
+                let totalHolidayOvertime = 0;
+                let totalRegularOvertime = 0;
+
+                querySnapshot.forEach((docSnap) => {
+                    const data = docSnap.data();
+                    if (window.currentUserRole !== 'admin' && data.name !== window.currentLoggedName) return; 
+                    
+                    if (data.startDate && data.startDate.startsWith(calcMonth)) {
+                        let hOver = parseFloat(data.holidayOvertime) || 0;
+                        let rOver = parseFloat(data.regularOvertime) || 0;
+                        
+                        if (hOver === 0 && rOver === 0 && data.overtimeHours) {
+                            if (data.isHoliday === true || String(data.isHoliday).toLowerCase() === 'true') {
+                                hOver = parseFloat(data.overtimeHours);
+                            } else {
+                                rOver = parseFloat(data.overtimeHours);
+                            }
+                        }
+                        
+                        totalHolidayOvertime += hOver;
+                        totalRegularOvertime += rOver;
+                    }
+                });
+
+                document.getElementById('calc_holiday_overtime').value = totalHolidayOvertime.toFixed(2);
+                document.getElementById('calc_regular_overtime').value = totalRegularOvertime.toFixed(2);
+                document.getElementById('calc_overtime_hours').value = (totalHolidayOvertime + totalRegularOvertime).toFixed(2);
+
+                runMonthlyCalculation();
+            } catch (e) { console.error(e); runMonthlyCalculation(); }
+        };
+
+        window.runMonthlyCalculation = function() {
+            const baseSalary = parseFloat(document.getElementById('calc_base_salary').value) || 0;
+            const hHours = parseFloat(document.getElementById('calc_holiday_overtime').value) || 0;
+            const rHours = parseFloat(document.getElementById('calc_regular_overtime').value) || 0;
+            
+            document.getElementById('calc_overtime_hours').value = (hHours + rHours).toFixed(2);
+            
+            const overtimeRate = parseFloat(document.getElementById('calc_overtime_rate').value) || 1.0;
+            const bonus = parseFloat(document.getElementById('calc_bonus').value) || 0;
+            const settlement = parseFloat(document.getElementById('calc_settlement').value) || 0;
+            const deductionDays = parseFloat(document.getElementById('calc_deduction_days').value) || 0;
+            const unpaidPermissions = parseInt(document.getElementById('calc_unpaid_permissions').value) || 0;
+            const unpaidVacations = parseInt(document.getElementById('calc_unpaid_vacations').value) || 0;
+
+            const dailyRate = baseSalary / 30;
+            const hourlyRate = dailyRate / 8;
+
+            const overtimeTotal = (hHours * hourlyRate * 1.0) + (rHours * hourlyRate * overtimeRate);
+            
+            const bonusAndSettlementTotal = bonus + settlement;
+            const totalDeductions = ((deductionDays + unpaidVacations) * dailyRate) + (unpaidPermissions * (hourlyRate * 2));
+            const netSalary = baseSalary + overtimeTotal + bonusAndSettlementTotal - totalDeductions;
+
+            document.getElementById('res_hourly_rate').innerText = `${hourlyRate.toFixed(1)} ج.م / ساعة`;
+            document.getElementById('res_overtime_total').innerText = `+${overtimeTotal.toFixed(0)} ج.م`;
+            document.getElementById('res_bonus_settlement').innerText = `+${bonusAndSettlementTotal.toFixed(0)} ج.م`;
+            document.getElementById('res_deductions_total').innerText = `-${totalDeductions.toFixed(0)} ج.م`;
+            document.getElementById('res_net_salary').innerText = `${netSalary.toFixed(0)} ج.م`;
+        };
+
+        window.saveMonthlySummary = async function() {
+            const currentName = document.getElementById('profile_name').innerText;
+            const month = document.getElementById('calc_month').value;
+            if(!month) return alert("برجاء اختيار الشهر والسنة!");
+            try {
+                await addDoc(collection(db, "monthly_calculations"), {
+                    name: currentName, month: month,
+                    baseSalary: parseFloat(document.getElementById('calc_base_salary').value) || 0,
+                    overtimeHours: parseFloat(document.getElementById('calc_overtime_hours').value) || 0,
+                    overtimeRate: parseFloat(document.getElementById('calc_overtime_rate').value) || 1.0,
+                    bonus: parseFloat(document.getElementById('calc_bonus').value) || 0,
+                    settlement: parseFloat(document.getElementById('calc_settlement').value) || 0,
+                    deductionDays: parseFloat(document.getElementById('calc_deduction_days').value) || 0,
+                    netSalary: document.getElementById('res_net_salary').innerText,
+                    createdAt: new Date()
+                });
+                alert(`✅ تم حفظ تقرير الشهر بنجاح ومزامنته سحابياً!`);
+            } catch(e) { alert("خطأ: " + e.message); }
+        };
+
+        window.startQuickMission = function() {
+            const place = prompt("يرجى إدخال جهة المأمورية:");
+            if (!place) return;
+            const current = getCurrentDateTime();
+            pendingMissions.push({ id: Date.now(), place: place.trim(), startDate: current.date, startTime: current.time });
+            savePendingToStorage(); updatePendingUI(); selectPendingMission(pendingMissions.length - 1);
+            navigateTo('mission', 'nav-mission');
+        };
+
+        function updatePendingUI() {
+            const badge = document.getElementById('missionBadge');
+            const container = document.getElementById('pendingContainer');
+            const list = document.getElementById('pendingList');
+            document.getElementById('stat_pending_missions').innerText = pendingMissions.length;
+
+            if (pendingMissions.length > 0) {
+                badge.innerText = pendingMissions.length; badge.style.display = 'inline-block';
+                container.style.display = 'block'; list.innerHTML = '';
+                pendingMissions.forEach((m, index) => {
+                    const isSelected = index === activeSelectedIndex ? 'selected' : '';
+                    list.innerHTML += `<div class="pending-card ${isSelected}" onclick="selectPendingMission(${index})">
+                        <div class="pending-info"><div class="status-dot"></div><div><strong style="color: #f8fafc; font-size: 13px;">إلى: ${m.place}</strong></div></div>
+                        <button onclick="cancelMission(event, ${index})" style="background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); padding: 4px 10px; border-radius: 6px; cursor: pointer; font-size: 11px;">إلغاء</button>
+                    </div>`;
+                });
+            } else { badge.style.display = 'none'; container.style.display = 'none'; activeSelectedIndex = null; resetFormFields(); }
+        }
+
+        window.selectPendingMission = function(index) {
+            activeSelectedIndex = index;
+            const m = pendingMissions[index];
+            if(m) {
+                document.getElementById('m_place').value = m.place; document.getElementById('m_start_date').value = m.startDate; document.getElementById('m_start_time').value = m.startTime;
+            }
+            updatePendingUI();
+        };
+
+        window.cancelMission = function(event, index) {
+            event.stopPropagation();
+            if(!confirm("إلغاء المأمورية المعلقة؟")) return;
+            pendingMissions.splice(index, 1);
+            savePendingToStorage();
+            if (activeSelectedIndex === index) { activeSelectedIndex = null; resetFormFields(); } 
+            else if (activeSelectedIndex > index) { activeSelectedIndex--; }
+            updatePendingUI();
+        };
+
+        function resetFormFields() {
+            document.getElementById('m_place').value = ''; document.getElementById('m_start_date').value = ''; document.getElementById('m_start_time').value = '';
+            document.getElementById('m_end_date').value = ''; document.getElementById('m_end_time').value = ''; document.getElementById('m_details').value = ''; document.getElementById('m_is_holiday').checked = false;
+        }
+
+        window.saveMission = async function() {
+            const name = document.getElementById('m_name').value;
+            const place = document.getElementById('m_place').value;
+            const startDate = document.getElementById('m_start_date').value;
+            const startTime = document.getElementById('m_start_time').value;
+            let endDate = document.getElementById('m_end_date').value;
+            let endTime = document.getElementById('m_end_time').value;
+            const isHoliday = document.getElementById('m_is_holiday').checked;
+            const details = document.getElementById('m_details').value;
+
+            if(!place || !startDate || !startTime) return alert("برجاء إكمال البيانات الأساسية للمأمورية!");
+            
+            if(!endDate) endDate = getCurrentDateTime().date;
+            if(!endTime) endTime = getCurrentDateTime().time;
+
+            const calc = calculateMissionOvertime(startDate, startTime, endDate, endTime, isHoliday);
+
+            try {
+                await addDoc(collection(db, "missions"), {
+                    name, place, startDate, startTime, endDate, endTime, isHoliday,
+                    details: details || "بدون تفاصيل",
+                    holidayOvertime: calc.holidayOvertime,
+                    regularOvertime: calc.regularOvertime,
+                    overtimeHours: calc.totalOvertime,
+                    isShortHoliday: calc.isShortHoliday,
+                    createdAt: new Date()
+                });
+                alert("تم تسجيل المأمورية بنجاح وحساب الإضافي تلقائياً!");
+                
+                if (activeSelectedIndex !== null) {
+                    pendingMissions.splice(activeSelectedIndex, 1);
+                    savePendingToStorage();
+                    activeSelectedIndex = null;
+                    updatePendingUI();
+                }
+                resetFormFields();
+                fetchOvertimeForCalcMonth(); 
+            } catch(e) {
+                alert("خطأ أثناء حفظ المأمورية: " + e.message);
+            }
+        };
+
+        window.updatePermissionTimeText = function() {
+            document.getElementById('p_time_info').innerText = document.getElementById('p_shift').value === 'morning' ? '⏰ من 9:00 ص إلى 11:00 ص' : '⏰ من 3:00 م إلى 5:00 م';
+        };
+
+        window.savePermission = async function() {
+            const name = document.getElementById('p_name').value;
+            const date = document.getElementById('p_date').value;
+            if (!date) return alert("برجاء تحديد تاريخ الإذن!");
+            try {
+                await addDoc(collection(db, "permissions"), {
+                    name: name, date: date, shift: document.getElementById('p_shift').value === 'morning' ? "صباحي" : "مسائي",
+                    timeRange: document.getElementById('p_shift').value === 'morning' ? "09:00 ص - 11:00 ص" : "03:00 م - 05:00 م",
+                    reason: document.getElementById('p_reason').value || "لم يذكر سبب", createdAt: new Date()
+                });
+                alert(`✅ تم إرسال طلب الإذن بنجاح!`);
+                document.getElementById('p_date').value = ''; document.getElementById('p_reason').value = '';
+            } catch (e) { alert("خطأ: " + e.message); }
+        };
+
+        window.handleVacationDurationChange = function() {
+            const t = document.getElementById('v_duration_type').value;
+            document.getElementById('group_days_count').style.display = t === 'multiple' ? 'flex' : 'none';
+            document.getElementById('group_end_date').style.display = t === 'multiple' ? 'flex' : 'none';
+            document.getElementById('group_shift_period').style.display = (t === 'half' || t === 'quarter') ? 'flex' : 'none';
+            updateShiftTimeText();
+        };
+
+        window.updateShiftTimeText = function() {
+            const t = document.getElementById('v_duration_type').value;
+            const shift = document.getElementById('v_shift_period').value;
+            const textDiv = document.getElementById('shiftTimeText');
+            if (t === 'half') textDiv.innerText = shift === 'morning' ? '⏰ من 9:00 ص إلى 1:00 م (4 ساعات)' : '⏰ من 1:00 م إلى 5:00 م (4 ساعات)';
+            else if (t === 'quarter') textDiv.innerText = shift === 'morning' ? '⏰ من 9:00 ص إلى 11:00 ص (ساعتان)' : '⏰ من 3:00 م إلى 5:00 م (ساعتان)';
+        };
+
+        window.calculateVacationDates = function(source) {
+            const startDateVal = document.getElementById('v_start_date').value;
+            if (!startDateVal) return;
+            const startDate = new Date(startDateVal);
+
+            if (source === 'count' || source === 'date') {
+                const count = parseInt(document.getElementById('v_days_count').value) || 1;
+                if (count > 1) {
+                    const endDate = new Date(startDate);
+                    endDate.setDate(startDate.getDate() + count - 1);
+                    document.getElementById('v_end_date').value = endDate.toISOString().split('T')[0];
+                } else {
+                    document.getElementById('v_end_date').value = startDateVal;
+                }
+            } else if (source === 'end_date') {
+                const endDateVal = document.getElementById('v_end_date').value;
+                if (!endDateVal) return;
+                const endDate = new Date(endDateVal);
+                const timeDiff = endDate.getTime() - startDate.getTime();
+                const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24)) + 1;
+                if (daysDiff > 0) {
+                    document.getElementById('v_days_count').value = daysDiff;
+                } else {
+                    document.getElementById('v_days_count').value = 1;
+                    document.getElementById('v_end_date').value = startDateVal;
+                }
+            }
+        };
+
+        window.saveVacation = async function() {
+            const name = document.getElementById('v_name').value;
+            const type = document.getElementById('v_type').value;
+            const durationType = document.getElementById('v_duration_type').value;
+            const startDate = document.getElementById('v_start_date').value;
+            const notes = document.getElementById('v_notes').value;
+
+            if (!startDate) return alert("برجاء تحديد تاريخ الإجازة!");
+
+            let endDate = startDate;
+            let durationText = "يوم كامل";
+
+            if (durationType === 'multiple') {
+                endDate = document.getElementById('v_end_date').value;
+                const count = document.getElementById('v_days_count').value;
+                durationText = `${count} أيام`;
+            } else if (durationType === 'half') {
+                const shift = document.getElementById('v_shift_period').value === 'morning' ? 'صباحي' : 'مسائي';
+                durationText = `نصف يوم (${shift})`;
+            } else if (durationType === 'quarter') {
+                const shift = document.getElementById('v_shift_period').value === 'morning' ? 'صباحي' : 'مسائي';
+                durationText = `ربع يوم (${shift})`;
+            }
+
+            try {
+                await addDoc(collection(db, "vacations"), {
+                    name, type, durationType, durationText, startDate, endDate,
+                    notes: notes || "بدون ملاحظات",
+                    createdAt: new Date()
+                });
+                alert("تم إرسال طلب الإجازة بنجاح!");
+                document.getElementById('v_start_date').value = '';
+                document.getElementById('v_end_date').value = '';
+                document.getElementById('v_notes').value = '';
+            } catch (e) {
+                alert("خطأ أثناء حفظ الإجازة: " + e.message);
+            }
+        };
+
+        window.switchReportTab = function(tabName, btn) {
+            currentReportType = tabName;
+            document.querySelectorAll('.report-tab-btn').forEach(b => b.classList.remove('active'));
+            if (btn) btn.classList.add('active');
+            fetchReports();
+        };
+
+        window.applyDateFilter = function() {
+            fetchReports();
+        };
+
+        window.resetDateFilter = function() {
+            document.getElementById('filter_from_date').value = '';
+            document.getElementById('filter_to_date').value = '';
+            fetchReports();
+        };
+
+        window.fetchReports = async function() {
+            const head = document.getElementById('reportsHead');
+            const body = document.getElementById('reportsTable');
+            head.innerHTML = '';
+            body.innerHTML = '';
+
+            const fromDate = document.getElementById('filter_from_date').value;
+            const toDate = document.getElementById('filter_to_date').value;
+            const filterCheck = (dateStr) => {
+                if (!dateStr) return true;
+                if (fromDate && dateStr < fromDate) return false;
+                if (toDate && dateStr > toDate) return false;
+                return true;
+            };
+
+            if (currentReportType === 'daily') {
+                head.innerHTML = `<tr><th>النوع</th><th>الموظف</th><th>التاريخ</th><th>التفاصيل</th><th>ملاحظات</th></tr>`;
+                try {
+                    const missions = await getDocs(collection(db, "missions"));
+                    const vacations = await getDocs(collection(db, "vacations"));
+                    const permissions = await getDocs(collection(db, "permissions"));
+                    let rows = [];
+
+                    missions.forEach(doc => {
+                        const data = doc.data();
+                        if((window.currentUserRole === 'admin' || data.name === window.currentLoggedName) && filterCheck(data.startDate)) {
+                            rows.push(`<tr><td>💼 مأمورية</td><td>${data.name}</td><td>${data.startDate}</td><td>جهة: ${data.place}</td><td>${data.details}</td></tr>`);
+                        }
+                    });
+                    vacations.forEach(doc => {
+                        const data = doc.data();
+                        if((window.currentUserRole === 'admin' || data.name === window.currentLoggedName) && filterCheck(data.startDate)) {
+                            rows.push(`<tr><td>🏖️ إجازة</td><td>${data.name}</td><td>${data.startDate}</td><td>${data.type} - ${data.durationText}</td><td>${data.notes}</td></tr>`);
+                        }
+                    });
+                    permissions.forEach(doc => {
+                        const data = doc.data();
+                        if((window.currentUserRole === 'admin' || data.name === window.currentLoggedName) && filterCheck(data.date)) {
+                            rows.push(`<tr><td>⏰ إذن</td><td>${data.name}</td><td>${data.date}</td><td>${data.timeRange}</td><td>${data.reason}</td></tr>`);
+                        }
+                    });
+                    body.innerHTML = rows.length > 0 ? rows.join('') : `<tr><td colspan="5" style="text-align:center;">لا توجد سجلات.</td></tr>`;
+                } catch(e) { console.error(e); }
+            }
+            else if (currentReportType === 'missions') {
+                head.innerHTML = `<tr><th>الموظف</th><th>الجهة</th><th>تاريخ البدء</th><th>الانطلاق</th><th>العودة</th><th>الإضافي العادي</th><th>إضافي إجازات</th><th>الإجمالي</th><th class="no-print">إجراءات</th></tr>`;
+                try {
+                    const querySnapshot = await getDocs(collection(db, "missions"));
+                    let count = 0, hTotal = 0, rTotal = 0;
+                    querySnapshot.forEach(docSnap => {
+                        const data = docSnap.data();
+                        if((window.currentUserRole === 'admin' || data.name === window.currentLoggedName) && filterCheck(data.startDate)) {
+                            count++;
+                            let hOver = parseFloat(data.holidayOvertime) || 0;
+                            let rOver = parseFloat(data.regularOvertime) || 0;
+                            if (hOver === 0 && rOver === 0 && data.overtimeHours) {
+                                 if (data.isHoliday === true || String(data.isHoliday).toLowerCase() === 'true') { hOver = parseFloat(data.overtimeHours); }
+                                 else { rOver = parseFloat(data.overtimeHours); }
+                            }
+                            hTotal += hOver; rTotal += rOver;
+                            const objStr = encodeURIComponent(JSON.stringify(data));
+                            body.innerHTML += `<tr>
+                                <td>${data.name}</td><td>${data.place}</td><td>${data.startDate}</td>
+                                <td>${data.startTime}</td><td>${data.endTime || '-'}</td>
+                                <td><span style="color:#38bdf8;">${rOver} س</span></td>
+                                <td><span style="color:#4ade80;">${hOver} س</span></td>
+                                <td><strong style="color:#d4af37;">${(hOver + rOver)} س</strong></td>
+                                <td class="no-print">
+                                    <button class="btn-whatsapp" onclick="sendToWhatsApp('mission', '${objStr}')">WhatsApp 💬</button>
+                                    ${window.currentUserRole === 'admin' ? `<button class="btn-table-del" onclick="deleteRecord('missions', '${docSnap.id}')">حذف</button>` : ''}
+                                </td>
+                            </tr>`;
+                        }
+                    });
+                    document.getElementById('stat_missions_count').innerText = count;
+                    document.getElementById('stat_holiday_overtime').innerText = hTotal.toFixed(2) + ' ساعة';
+                    document.getElementById('stat_regular_overtime').innerText = rTotal.toFixed(2) + ' ساعة';
+                    if(count === 0) body.innerHTML = `<tr><td colspan="9" style="text-align:center;">لا توجد مأموريات.</td></tr>`;
+                } catch(e) {}
+            }
+            else if (currentReportType === 'vacations') {
+                head.innerHTML = `<tr><th>الموظف</th><th>النوع</th><th>تاريخ البدء</th><th>تاريخ الانتهاء</th><th>المدة</th><th class="no-print">إجراءات</th></tr>`;
+                try {
+                    const querySnapshot = await getDocs(collection(db, "vacations"));
+                    let count = 0;
+                    querySnapshot.forEach(docSnap => {
+                        const data = docSnap.data();
+                        if((window.currentUserRole === 'admin' || data.name === window.currentLoggedName) && filterCheck(data.startDate)) {
+                            count++;
+                            const objStr = encodeURIComponent(JSON.stringify(data));
+                            body.innerHTML += `<tr>
+                                <td>${data.name}</td><td>${data.type}</td><td>${data.startDate}</td><td>${data.endDate || data.startDate}</td><td>${data.durationText}</td>
+                                <td class="no-print">
+                                    <button class="btn-whatsapp" onclick="sendToWhatsApp('vacation', '${objStr}')">WhatsApp 💬</button>
+                                    ${window.currentUserRole === 'admin' ? `<button class="btn-table-del" onclick="deleteRecord('vacations', '${docSnap.id}')">حذف</button>` : ''}
+                                </td>
+                            </tr>`;
+                        }
+                    });
+                    document.getElementById('stat_vacations_count').innerText = count;
+                    if(count === 0) body.innerHTML = `<tr><td colspan="6" style="text-align:center;">لا توجد إجازات.</td></tr>`;
+                } catch(e) {}
+            }
+            else if (currentReportType === 'permissions') {
+                head.innerHTML = `<tr><th>الموظف</th><th>التاريخ</th><th>الفترة</th><th>الوقت</th><th>السبب</th><th class="no-print">إجراءات</th></tr>`;
+                try {
+                    const querySnapshot = await getDocs(collection(db, "permissions"));
+                    let count = 0;
+                    querySnapshot.forEach(docSnap => {
+                        const data = docSnap.data();
+                        if((window.currentUserRole === 'admin' || data.name === window.currentLoggedName) && filterCheck(data.date)) {
+                            count++;
+                            const objStr = encodeURIComponent(JSON.stringify(data));
+                            body.innerHTML += `<tr>
+                                <td>${data.name}</td><td>${data.date}</td><td>${data.shift}</td><td>${data.timeRange}</td><td>${data.reason}</td>
+                                <td class="no-print">
+                                    <button class="btn-whatsapp" onclick="sendToWhatsApp('permission', '${objStr}')">WhatsApp 💬</button>
+                                    ${window.currentUserRole === 'admin' ? `<button class="btn-table-del" onclick="deleteRecord('permissions', '${docSnap.id}')">حذف</button>` : ''}
+                                </td>
+                            </tr>`;
+                        }
+                    });
+                    document.getElementById('stat_permissions_count').innerText = count;
+                    if(count === 0) body.innerHTML = `<tr><td colspan="6" style="text-align:center;">لا توجد أذونات.</td></tr>`;
+                } catch(e) {}
+            }
+            else if (currentReportType === 'calculations') {
+                head.innerHTML = `<tr><th>الموظف</th><th>الشهر</th><th>الأساسي</th><th>الإضافي (س)</th><th>مكافآت</th><th>خصومات (أيام)</th><th>صافي الراتب</th><th class="no-print">إجراءات</th></tr>`;
+                try {
+                    const querySnapshot = await getDocs(collection(db, "monthly_calculations"));
+                    let rows = [];
+                    let latestNet = '0 ج.م';
+                    let lastDate = 0;
+                    querySnapshot.forEach(docSnap => {
+                        const data = docSnap.data();
+                        if (window.currentUserRole === 'admin' || data.name === window.currentLoggedName) {
+                            rows.push({ id: docSnap.id, ...data });
+                            const d = new Date(data.createdAt?.seconds * 1000 || 0).getTime();
+                            if (d > lastDate) { lastDate = d; latestNet = data.netSalary; }
+                        }
+                    });
+                    document.getElementById('stat_latest_net').innerText = latestNet;
+                    
+                    rows.forEach(data => {
+                        body.innerHTML += `<tr>
+                            <td>${data.name}</td><td>${data.month}</td><td>${data.baseSalary}</td><td>${data.overtimeHours}</td>
+                            <td>${data.bonus + data.settlement}</td><td>${data.deductionDays}</td>
+                            <td><strong style="color:#d4af37;">${data.netSalary}</strong></td>
+                            <td class="no-print">
+                                ${window.currentUserRole === 'admin' ? `<button class="btn-table-del" onclick="deleteRecord('monthly_calculations', '${data.id}')">حذف</button>` : ''}
+                            </td>
+                        </tr>`;
+                    });
+                    if(rows.length === 0) body.innerHTML = `<tr><td colspan="8" style="text-align:center;">لا توجد تقارير رواتب مسجلة.</td></tr>`;
+                } catch(e) {}
+            }
+        };
+    </script>
+</body>
+</html>
