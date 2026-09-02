@@ -2366,214 +2366,231 @@
             const type = document.getElementById('v_type').value;
             const durationType = document.getElementById('v_duration_type').value;
             const startDate = document.getElementById('v_start_date').value;
-            const notes = document.getElementById('v_notes').value;
+            const endDate = document.getElementById('v_end_date').value || startDate;
+            const notes = document.getElementById('v_notes').value || "بدون ملاحظات";
 
             if (!startDate) return alert("برجاء تحديد تاريخ الإجازة!");
 
-            let endDate = startDate;
             let durationText = "يوم كامل";
-
             if (durationType === 'multiple') {
-                endDate = document.getElementById('v_end_date').value;
-                const count = document.getElementById('v_days_count').value;
-                durationText = `${count} أيام`;
+                const days = document.getElementById('v_days_count').value;
+                durationText = `${days} أيام`;
             } else if (durationType === 'half') {
                 const shift = document.getElementById('v_shift_period').value === 'morning' ? 'صباحي' : 'مسائي';
-                durationText = `نصف يوم (${shift})`;
+                durationText = `نصف يوم (${shift}) - 4 ساعات`;
             } else if (durationType === 'quarter') {
                 const shift = document.getElementById('v_shift_period').value === 'morning' ? 'صباحي' : 'مسائي';
-                durationText = `ربع يوم (${shift})`;
+                durationText = `ربع يوم (${shift}) - ساعتان`;
             }
 
             try {
                 await addDoc(collection(db, "vacations"), {
-                    name, type, durationType, durationText, startDate, endDate,
-                    notes: notes || "بدون ملاحظات",
-                    createdAt: new Date()
+                    name, type, durationType, durationText, startDate, endDate, notes, createdAt: new Date()
                 });
-                alert("تم إرسال طلب الإجازة بنجاح!");
+                alert("✅ تم إرسال طلب الإجازة بنجاح وتخزينه سحابياً!");
                 document.getElementById('v_start_date').value = '';
                 document.getElementById('v_end_date').value = '';
                 document.getElementById('v_notes').value = '';
             } catch (e) {
-                alert("خطأ أثناء حفظ الإجازة: " + e.message);
+                alert("❌ خطأ أثناء حفظ الإجازة: " + e.message);
             }
         };
 
-        window.switchReportTab = function(tabName, btn) {
-            currentReportType = tabName;
-            document.querySelectorAll('.report-tab-btn').forEach(b => b.classList.remove('active'));
-            if (btn) btn.classList.add('active');
-            fetchReports();
-        };
-
-        window.applyDateFilter = function() {
-            fetchReports();
-        };
-
-        window.resetDateFilter = function() {
-            document.getElementById('filter_from_date').value = '';
-            document.getElementById('filter_to_date').value = '';
-            fetchReports();
+        window.switchReportTab = function(type, btnElement) {
+            currentReportType = type;
+            document.querySelectorAll('.reports-controls .report-tab-btn').forEach(b => b.classList.remove('active'));
+            if(btnElement) btnElement.classList.add('active');
+            renderReportsTable();
         };
 
         window.fetchReports = async function() {
+            try {
+                const mSnap = await getDocs(collection(db, "missions"));
+                allMissionsData = [];
+                mSnap.forEach(d => allMissionsData.push({ id: d.id, ...d.data() }));
+
+                const vSnap = await getDocs(collection(db, "vacations"));
+                allVacationsData = [];
+                vSnap.forEach(d => allVacationsData.push({ id: d.id, ...d.data() }));
+
+                const pSnap = await getDocs(collection(db, "permissions"));
+                allPermissionsData = [];
+                pSnap.forEach(d => allPermissionsData.push({ id: d.id, ...d.data() }));
+
+                const cSnap = await getDocs(collection(db, "monthly_calculations"));
+                allCalculationsData = [];
+                cSnap.forEach(d => allCalculationsData.push({ id: d.id, ...d.data() }));
+
+                let totalHOver = 0, totalROver = 0;
+                allMissionsData.forEach(m => {
+                    if (window.currentUserRole === 'admin' || m.name === window.currentLoggedName) {
+                        totalHOver += parseFloat(m.holidayOvertime) || 0;
+                        totalROver += parseFloat(m.regularOvertime) || 0;
+                    }
+                });
+
+                document.getElementById('stat_missions_count').innerText = allMissionsData.filter(m => window.currentUserRole === 'admin' || m.name === window.currentLoggedName).length;
+                document.getElementById('stat_vacations_count').innerText = allVacationsData.filter(v => window.currentUserRole === 'admin' || v.name === window.currentLoggedName).length;
+                document.getElementById('stat_permissions_count').innerText = allPermissionsData.filter(p => window.currentUserRole === 'admin' || p.name === window.currentLoggedName).length;
+                document.getElementById('stat_holiday_overtime').innerText = totalHOver.toFixed(1) + ' س';
+                document.getElementById('stat_regular_overtime').innerText = totalROver.toFixed(1) + ' س';
+                
+                if (allCalculationsData.length > 0) {
+                    const sorted = allCalculationsData.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+                    const latest = sorted.find(c => window.currentUserRole === 'admin' || c.name === window.currentLoggedName);
+                    document.getElementById('stat_latest_net').innerText = latest ? latest.netSalary : '0 ج.م';
+                } else {
+                    document.getElementById('stat_latest_net').innerText = '0 ج.م';
+                }
+
+                renderReportsTable();
+            } catch(e) {}
+        };
+
+        window.applyDateFilter = function() { renderReportsTable(); };
+        window.resetDateFilter = function() {
+            document.getElementById('filter_from_date').value = '';
+            document.getElementById('filter_to_date').value = '';
+            renderReportsTable();
+        };
+
+        function filterByDate(itemDate) {
+            const from = document.getElementById('filter_from_date').value;
+            const to = document.getElementById('filter_to_date').value;
+            if (!itemDate) return true;
+            if (from && itemDate < from) return false;
+            if (to && itemDate > to) return false;
+            return true;
+        }
+
+        function renderReportsTable() {
             const head = document.getElementById('reportsHead');
             const body = document.getElementById('reportsTable');
-            head.innerHTML = '';
-            body.innerHTML = '';
+            const title = document.getElementById('reportTitle');
+            if(!head || !body) return;
 
-            const fromDate = document.getElementById('filter_from_date').value;
-            const toDate = document.getElementById('filter_to_date').value;
-            const filterCheck = (dateStr) => {
-                if (!dateStr) return true;
-                if (fromDate && dateStr < fromDate) return false;
-                if (toDate && dateStr > toDate) return false;
-                return true;
-            };
+            const filterUser = (item) => window.currentUserRole === 'admin' || item.name === window.currentLoggedName;
 
             if (currentReportType === 'daily') {
-                head.innerHTML = `<tr><th>النوع</th><th>الموظف</th><th>التاريخ</th><th>التفاصيل</th><th>ملاحظات</th></tr>`;
-                try {
-                    const missions = await getDocs(collection(db, "missions"));
-                    const vacations = await getDocs(collection(db, "vacations"));
-                    const permissions = await getDocs(collection(db, "permissions"));
-                    let rows = [];
+                title.innerText = "الملخص اليومي المجمع لجميع الأنشطة";
+                head.innerHTML = `<tr><th>التاريخ</th><th>الموظف</th><th>نوع النشاط</th><th>التفاصيل والجهة</th><th>ملاحظات / إضافي</th><th class="no-print">إجراء</th></tr>`;
+                body.innerHTML = '';
+                
+                let combined = [];
+                allMissionsData.filter(filterUser).forEach(m => combined.push({ date: m.startDate, name: m.name, type: 'مأمورية عمل', details: `إلى: ${m.place}`, extra: `${m.overtimeHours} ساعة إضافي`, coll: 'missions', id: m.id, raw: m }));
+                allVacationsData.filter(filterUser).forEach(v => combined.push({ date: v.startDate, name: v.name, type: `إجازة (${v.type})`, details: v.durationText, extra: v.notes, coll: 'vacations', id: v.id }));
+                allPermissionsData.filter(filterUser).forEach(p => combined.push({ date: p.date, name: p.name, type: 'إذن مغادرة', details: `${p.shift} (${p.timeRange})`, extra: p.reason, coll: 'permissions', id: p.id }));
 
-                    missions.forEach(doc => {
-                        const data = doc.data();
-                        if((window.currentUserRole === 'admin' || data.name === window.currentLoggedName) && filterCheck(data.startDate)) {
-                            rows.push(`<tr><td>💼 مأمورية</td><td>${data.name}</td><td>${data.startDate}</td><td>جهة: ${data.place}</td><td>${data.details}</td></tr>`);
-                        }
-                    });
-                    vacations.forEach(doc => {
-                        const data = doc.data();
-                        if((window.currentUserRole === 'admin' || data.name === window.currentLoggedName) && filterCheck(data.startDate)) {
-                            rows.push(`<tr><td>🏖️ إجازة</td><td>${data.name}</td><td>${data.startDate}</td><td>${data.type} - ${data.durationText}</td><td>${data.notes}</td></tr>`);
-                        }
-                    });
-                    permissions.forEach(doc => {
-                        const data = doc.data();
-                        if((window.currentUserRole === 'admin' || data.name === window.currentLoggedName) && filterCheck(data.date)) {
-                            rows.push(`<tr><td>⏰ إذن</td><td>${data.name}</td><td>${data.date}</td><td>${data.timeRange}</td><td>${data.reason}</td></tr>`);
-                        }
-                    });
-                    body.innerHTML = rows.length > 0 ? rows.join('') : `<tr><td colspan="5" style="text-align:center;">لا توجد سجلات.</td></tr>`;
-                } catch(e) { console.error(e); }
+                combined = combined.filter(item => filterByDate(item.date)).sort((a,b) => new Date(b.date) - new Date(a.date));
+
+                if(combined.length === 0) {
+                    body.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #94a3b8;">لا توجد سجلات مطابقة للفترة المحددة.</td></tr>`;
+                    return;
+                }
+
+                combined.forEach(item => {
+                    let waBtn = '';
+                    if (item.coll === 'missions') {
+                        waBtn = `<button class="btn-whatsapp" onclick="sendToWhatsApp('mission', '${encodeURIComponent(JSON.stringify(item.raw))}')">واتساب 💬</button>`;
+                    }
+                    body.innerHTML += `<tr>
+                        <td>${item.date}</td><td>${item.name}</td><td><strong style="color:#d4af37">${item.type}</strong></td>
+                        <td>${item.details}</td><td>${item.extra}</td>
+                        <td class="no-print">
+                            ${waBtn}
+                            <button class="btn-table-del" onclick="deleteRecord('${item.coll}', '${item.id}')">حذف 🗑️</button>
+                        </td>
+                    </tr>`;
+                });
+
+            } else if (currentReportType === 'missions') {
+                title.innerText = "تقرير مأموريات العمل";
+                head.innerHTML = `<tr><th>الموظف</th><th>الجهة</th><th>التاريخ</th><th>الوقت</th><th>الإضافي</th><th>التفاصيل</th><th class="no-print">إجراءات</th></tr>`;
+                body.innerHTML = '';
+                const filtered = allMissionsData.filter(filterUser).filter(m => filterByDate(m.startDate));
+                
+                if(filtered.length === 0) {
+                    body.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #94a3b8;">لا توجد مأموريات مسجلة.</td></tr>`;
+                    return;
+                }
+
+                filtered.forEach(m => {
+                    body.innerHTML += `<tr>
+                        <td>${m.name}</td><td>${m.place}</td><td>${m.startDate}</td><td>${m.startTime}</td>
+                        <td><span style="color:#4ade80; font-weight:bold;">${m.overtimeHours} س</span></td>
+                        <td>${m.details}</td>
+                        <td class="no-print">
+                            <button class="btn-whatsapp" onclick="sendToWhatsApp('mission', '${encodeURIComponent(JSON.stringify(m))}')">واتساب 💬</button>
+                            <button class="btn-table-del" onclick="deleteRecord('missions', '${m.id}')">حذف 🗑️</button>
+                        </td>
+                    </tr>`;
+                });
+
+            } else if (currentReportType === 'vacations') {
+                title.innerText = "تقرير طلبات الإجازات";
+                head.innerHTML = `<tr><th>الموظف</th><th>نوع الإجازة</th><th>المدة</th><th>من تاريخ</th><th>إلى تاريخ</th><th>ملاحظات</th><th class="no-print">إجراء</th></tr>`;
+                body.innerHTML = '';
+                const filtered = allVacationsData.filter(filterUser).filter(v => filterByDate(v.startDate));
+
+                if(filtered.length === 0) {
+                    body.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #94a3b8;">لا توجد إجازات مسجلة.</td></tr>`;
+                    return;
+                }
+
+                filtered.forEach(v => {
+                    body.innerHTML += `<tr>
+                        <td>${v.name}</td><td>${v.type}</td><td>${v.durationText}</td>
+                        <td>${v.startDate}</td><td>${v.endDate}</td><td>${v.notes}</td>
+                        <td class="no-print">
+                            <button class="btn-whatsapp" onclick="sendToWhatsApp('vacation', '${encodeURIComponent(JSON.stringify(v))}')">واتساب 💬</button>
+                            <button class="btn-table-del" onclick="deleteRecord('vacations', '${v.id}')">حذف 🗑️</button>
+                        </td>
+                    </tr>`;
+                });
+
+            } else if (currentReportType === 'permissions') {
+                title.innerText = "تقرير أذونات المغادرة";
+                head.innerHTML = `<tr><th>الموظف</th><th>التاريخ</th><th>الفترة</th><th>الوقت</th><th>السبب</th><th class="no-print">إجراء</th></tr>`;
+                body.innerHTML = '';
+                const filtered = allPermissionsData.filter(filterUser).filter(p => filterByDate(p.date));
+
+                if(filtered.length === 0) {
+                    body.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #94a3b8;">لا توجد أذونات مسجلة.</td></tr>`;
+                    return;
+                }
+
+                filtered.forEach(p => {
+                    body.innerHTML += `<tr>
+                        <td>${p.name}</td><td>${p.date}</td><td>${p.shift}</td><td>${p.timeRange}</td><td>${p.reason}</td>
+                        <td class="no-print">
+                            <button class="btn-whatsapp" onclick="sendToWhatsApp('permission', '${encodeURIComponent(JSON.stringify(p))}')">واتساب 💬</button>
+                            <button class="btn-table-del" onclick="deleteRecord('permissions', '${p.id}')">حذف 🗑️</button>
+                        </td>
+                    </tr>`;
+                });
+
+            } else if (currentReportType === 'calculations') {
+                title.innerText = "ملخصات الحاسبة الشهرية للرواتب";
+                head.innerHTML = `<tr><th>الشهر والسنة</th><th>الموظف</th><th>الأساسي</th><th>ساعات الإضافي</th><th>صافي الراتب</th><th class="no-print">إجراء</th></tr>`;
+                body.innerHTML = '';
+                const filtered = allCalculationsData.filter(filterUser);
+
+                if(filtered.length === 0) {
+                    body.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #94a3b8;">لا توجد ملخصات مالية مسجلة.</td></tr>`;
+                    return;
+                }
+
+                filtered.forEach(c => {
+                    body.innerHTML += `<tr>
+                        <td>${c.month}</td><td>${c.name}</td><td>${c.baseSalary} ج.م</td>
+                        <td>${c.overtimeHours} ساعة</td><td><strong style="color:#d4af37">${c.netSalary}</strong></td>
+                        <td class="no-print">
+                            <button class="btn-table-del" onclick="deleteRecord('monthly_calculations', '${c.id}')">حذف 🗑️</button>
+                        </td>
+                    </tr>`;
+                });
             }
-            else if (currentReportType === 'missions') {
-                head.innerHTML = `<tr><th>الموظف</th><th>الجهة</th><th>تاريخ البدء</th><th>الانطلاق</th><th>العودة</th><th>الإضافي العادي</th><th>إضافي إجازات</th><th>الإجمالي</th><th class="no-print">إجراءات</th></tr>`;
-                try {
-                    const querySnapshot = await getDocs(collection(db, "missions"));
-                    let count = 0, hTotal = 0, rTotal = 0;
-                    querySnapshot.forEach(docSnap => {
-                        const data = docSnap.data();
-                        if((window.currentUserRole === 'admin' || data.name === window.currentLoggedName) && filterCheck(data.startDate)) {
-                            count++;
-                            let hOver = parseFloat(data.holidayOvertime) || 0;
-                            let rOver = parseFloat(data.regularOvertime) || 0;
-                            if (hOver === 0 && rOver === 0 && data.overtimeHours) {
-                                 if (data.isHoliday === true || String(data.isHoliday).toLowerCase() === 'true') { hOver = parseFloat(data.overtimeHours); }
-                                 else { rOver = parseFloat(data.overtimeHours); }
-                            }
-                            hTotal += hOver; rTotal += rOver;
-                            const objStr = encodeURIComponent(JSON.stringify(data));
-                            body.innerHTML += `<tr>
-                                <td>${data.name}</td><td>${data.place}</td><td>${data.startDate}</td>
-                                <td>${data.startTime}</td><td>${data.endTime || '-'}</td>
-                                <td><span style="color:#38bdf8;">${rOver} س</span></td>
-                                <td><span style="color:#4ade80;">${hOver} س</span></td>
-                                <td><strong style="color:#d4af37;">${(hOver + rOver)} س</strong></td>
-                                <td class="no-print">
-                                    <button class="btn-whatsapp" onclick="sendToWhatsApp('mission', '${objStr}')">WhatsApp 💬</button>
-                                    ${window.currentUserRole === 'admin' ? `<button class="btn-table-del" onclick="deleteRecord('missions', '${docSnap.id}')">حذف</button>` : ''}
-                                </td>
-                            </tr>`;
-                        }
-                    });
-                    document.getElementById('stat_missions_count').innerText = count;
-                    document.getElementById('stat_holiday_overtime').innerText = hTotal.toFixed(2) + ' ساعة';
-                    document.getElementById('stat_regular_overtime').innerText = rTotal.toFixed(2) + ' ساعة';
-                    if(count === 0) body.innerHTML = `<tr><td colspan="9" style="text-align:center;">لا توجد مأموريات.</td></tr>`;
-                } catch(e) {}
-            }
-            else if (currentReportType === 'vacations') {
-                head.innerHTML = `<tr><th>الموظف</th><th>النوع</th><th>تاريخ البدء</th><th>تاريخ الانتهاء</th><th>المدة</th><th class="no-print">إجراءات</th></tr>`;
-                try {
-                    const querySnapshot = await getDocs(collection(db, "vacations"));
-                    let count = 0;
-                    querySnapshot.forEach(docSnap => {
-                        const data = docSnap.data();
-                        if((window.currentUserRole === 'admin' || data.name === window.currentLoggedName) && filterCheck(data.startDate)) {
-                            count++;
-                            const objStr = encodeURIComponent(JSON.stringify(data));
-                            body.innerHTML += `<tr>
-                                <td>${data.name}</td><td>${data.type}</td><td>${data.startDate}</td><td>${data.endDate || data.startDate}</td><td>${data.durationText}</td>
-                                <td class="no-print">
-                                    <button class="btn-whatsapp" onclick="sendToWhatsApp('vacation', '${objStr}')">WhatsApp 💬</button>
-                                    ${window.currentUserRole === 'admin' ? `<button class="btn-table-del" onclick="deleteRecord('vacations', '${docSnap.id}')">حذف</button>` : ''}
-                                </td>
-                            </tr>`;
-                        }
-                    });
-                    document.getElementById('stat_vacations_count').innerText = count;
-                    if(count === 0) body.innerHTML = `<tr><td colspan="6" style="text-align:center;">لا توجد إجازات.</td></tr>`;
-                } catch(e) {}
-            }
-            else if (currentReportType === 'permissions') {
-                head.innerHTML = `<tr><th>الموظف</th><th>التاريخ</th><th>الفترة</th><th>الوقت</th><th>السبب</th><th class="no-print">إجراءات</th></tr>`;
-                try {
-                    const querySnapshot = await getDocs(collection(db, "permissions"));
-                    let count = 0;
-                    querySnapshot.forEach(docSnap => {
-                        const data = docSnap.data();
-                        if((window.currentUserRole === 'admin' || data.name === window.currentLoggedName) && filterCheck(data.date)) {
-                            count++;
-                            const objStr = encodeURIComponent(JSON.stringify(data));
-                            body.innerHTML += `<tr>
-                                <td>${data.name}</td><td>${data.date}</td><td>${data.shift}</td><td>${data.timeRange}</td><td>${data.reason}</td>
-                                <td class="no-print">
-                                    <button class="btn-whatsapp" onclick="sendToWhatsApp('permission', '${objStr}')">WhatsApp 💬</button>
-                                    ${window.currentUserRole === 'admin' ? `<button class="btn-table-del" onclick="deleteRecord('permissions', '${docSnap.id}')">حذف</button>` : ''}
-                                </td>
-                            </tr>`;
-                        }
-                    });
-                    document.getElementById('stat_permissions_count').innerText = count;
-                    if(count === 0) body.innerHTML = `<tr><td colspan="6" style="text-align:center;">لا توجد أذونات.</td></tr>`;
-                } catch(e) {}
-            }
-            else if (currentReportType === 'calculations') {
-                head.innerHTML = `<tr><th>الموظف</th><th>الشهر</th><th>الأساسي</th><th>الإضافي (س)</th><th>مكافآت</th><th>خصومات (أيام)</th><th>صافي الراتب</th><th class="no-print">إجراءات</th></tr>`;
-                try {
-                    const querySnapshot = await getDocs(collection(db, "monthly_calculations"));
-                    let rows = [];
-                    let latestNet = '0 ج.م';
-                    let lastDate = 0;
-                    querySnapshot.forEach(docSnap => {
-                        const data = docSnap.data();
-                        if (window.currentUserRole === 'admin' || data.name === window.currentLoggedName) {
-                            rows.push({ id: docSnap.id, ...data });
-                            const d = new Date(data.createdAt?.seconds * 1000 || 0).getTime();
-                            if (d > lastDate) { lastDate = d; latestNet = data.netSalary; }
-                        }
-                    });
-                    document.getElementById('stat_latest_net').innerText = latestNet;
-                    
-                    rows.forEach(data => {
-                        body.innerHTML += `<tr>
-                            <td>${data.name}</td><td>${data.month}</td><td>${data.baseSalary}</td><td>${data.overtimeHours}</td>
-                            <td>${data.bonus + data.settlement}</td><td>${data.deductionDays}</td>
-                            <td><strong style="color:#d4af37;">${data.netSalary}</strong></td>
-                            <td class="no-print">
-                                ${window.currentUserRole === 'admin' ? `<button class="btn-table-del" onclick="deleteRecord('monthly_calculations', '${data.id}')">حذف</button>` : ''}
-                            </td>
-                        </tr>`;
-                    });
-                    if(rows.length === 0) body.innerHTML = `<tr><td colspan="8" style="text-align:center;">لا توجد تقارير رواتب مسجلة.</td></tr>`;
-                } catch(e) {}
-            }
-        };
+        }
     </script>
 </body>
 </html>
